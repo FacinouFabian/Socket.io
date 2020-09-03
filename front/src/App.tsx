@@ -18,7 +18,7 @@ export default function App(): JSX.Element {
     { slug: 'hello', Component: Hello, path: ['/'] },
     { slug: 'register', Component: Register },
     { slug: 'rooms', Component: Rooms },
-    { slug: 'game', Component: Game },
+    { slug: 'games', Component: Game },
   ]
 
   return (

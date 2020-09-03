@@ -1,28 +1,46 @@
 import React, { useState, useEffect } from "react";
+import { Link } from 'react-router-dom'
+import { useUser } from '../core/contexts/userContext'
 
-type Props = {
-  io: SocketIOClient.Socket;
-  nickname: string;
-};
+type Player = {
+  name: string,
+  points: number
+}
 
-type Room = {
-    id:number;
-    player1: string;
-    player2?: string;
-};
+type Players = Player[]
 
-export default function Rooms({ io, nickname }: Props): JSX.Element {
-  const [rooms, setRooms] = useState<Room[]>([{id: 1, player1: "Me"}, {id: 2, player1: "Me", player2: "You"}]);
+type Game = {
+  id: number,
+  beg: string,
+  end: string,
+  players: Players
+}
 
-  const handleJoin = (room: number) => {
-    io.emit("game::join", JSON.stringify({roomId: room, nickname}))
+export default function Rooms(): JSX.Element {
+  const [rooms, setRooms] = useState<Game[]>([]);
+  const [user, dispatch] = useUser()
+  const { io } = user
+
+  const handleJoin = (roomId: number) => {
+    io.emit("game::joinParty", JSON.stringify({ roomId, nickname: user.nickname }))
   };
 
   useEffect(() => {
-    io.on('game::create', ({ games }: { games: Room[] }) => {
-        setRooms(games)
-        console.log('rooms now')
-        console.log(rooms)
+    io.emit("game::getRooms")
+
+    io.on('game::rooms', ({ games }: { games: Game[] }) => {
+      setRooms(games)
+    })
+
+    io.on('game::create', ({ games }: { games: Game[] }) => {
+      setRooms(games)
+      console.log('rooms now')
+      console.log(rooms)
+    })
+
+    io.on('game::join', ({ game }: { game: Game }) => {
+      console.log('Request for')
+      console.log(game)
     })
   })
 
@@ -30,26 +48,28 @@ export default function Rooms({ io, nickname }: Props): JSX.Element {
     <div className="m-auto">
       <div className="w-full">
         <ul className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            { rooms.map((item: Room): JSX.Element | null => {
-                if (Object.entries(item).length === 0 || Object.entries(item).length === 2) {
+            { rooms.map((item: Game): JSX.Element | null => {
+                if (item.players.length === 2) {
                     return null
                 } else {
                     return (
                         <li className="col-span-1 bg-white rounded-lg shadow">
                             <div className="bg-white overflow-hidden shadow rounded-lg">
                                 <div className="border-b border-gray-200 px-4 py-5 sm:px-6">
-                                    <h1>{item.player1}'s party</h1>
+                                    <h1>{item.players[0].name}'s party</h1>
                                 </div>
                                 <div className="px-4 py-5 sm:p-6">
                                     <span>
-                                        Players: {Object.keys(item).length === 1 ? '1' : ''}
+                                        Players: {item.players.length === 1 ? '1' : ''}
                                     </span>
                                 </div>
                                 <div className="border-t border-gray-200">
                                     <button 
-                                        onClick={(): void => handleJoin(2)}
+                                        onClick={(): void => handleJoin(item.id)}
                                         className="px-4 py-4 sm:px-6 w-full h-full bg-red-800 text-white">
-                                        Join
+                                        <Link to="/games">
+                                          Join
+                                        </Link>
                                     </button>
                                 </div>
                             </div>

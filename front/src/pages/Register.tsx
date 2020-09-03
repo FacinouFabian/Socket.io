@@ -11,26 +11,22 @@ type Player = {
 export default function Register(): JSX.Element {
   const [player, setPlayer] = useState<Player>();
   const { value: nickname, bind } = useInput();
-  const [user, io] = useUser()
+  const [user, dispatch] = useUser()
+  const { io } = user
 
   const handleJoinParty = () => {
-/*     io.on("game::start", ({ points }: { points: number }) => {
+    io.on("game::start", ({ points }: { points: number }) => {
       setPlayer({ nickname, points });
     });
 
-    io.emit("game::sendNickname", JSON.stringify({ nickname })) */
+    io.emit("game::sendNickname", JSON.stringify({ nickname }))
   
   };
 
   const handleCreateParty = () => {
-/*     io.emit("game::sendNickname", JSON.stringify({ nickname }))
-    io.emit("game::createParty", JSON.stringify({ nickname })) */
+    io.emit("game::sendNickname", JSON.stringify({ nickname }))
+    io.emit("game::createParty", JSON.stringify({ nickname }))
   }
-
-  useEffect(() => {
-    console.log(io)
-    console.log(user)
-  })
 
   return (
     <div className="m-auto">
@@ -55,20 +51,18 @@ export default function Register(): JSX.Element {
               type="button"
               onClick={() => handleJoinParty()}
             >
-              <Link to="/rooms">Send and join a party</Link>
-              <Link
-                to={{
-                  pathname: "/rooms",
-                  props: { nickname: player?.nickname }
-                }}
-              />
+              <Link to="/rooms">
+                Send and join a party
+              </Link>
             </button>
             <button
               className="mt-2 bg-red-800 hover:bg-blue-800 text-white px-2 py-2 rounded-md"
               type="button"
               onClick={() => handleCreateParty()}
             >
-              Send and create a party
+              <Link to="/games">
+                Send and create a party
+              </Link>
             </button>
           </div>
         </form>

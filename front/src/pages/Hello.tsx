@@ -8,13 +8,7 @@ import Register from './Register'
 }; */
 
 export default function Hello(): JSX.Element {
-  const [ioContext, dispatch] = useUser()
-  const [io, setIo] = useState<SocketIOClient.Socket>()
-
-  const connectIoServer = () => {
-    setIo(ioContext)
-    console.log(io)
-  };
+  const [{ io }, dispatch] = useUser()
 
   return (
     <div className="h-full flex">
@@ -24,7 +18,6 @@ export default function Hello(): JSX.Element {
             <button
               className="bg-blue-800 hover:bg-red-800 text-white px-8 py-8 rounded-md"
               type="button"
-              onClick={() => connectIoServer()}
             >
               Join the Game
             </button>
