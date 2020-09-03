@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "target": "esnext",                          
+    "module": "commonjs",                    
+    "lib": ["dom", "esnext"],                     
+    "allowJs": false,
+    "esModuleInterop": true,
+    "moduleResolution": "node",
+    "resolveJsonModule": true
+  },
+  "include": ["src"]
+}

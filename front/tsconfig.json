@@ -1,0 +1,36 @@
+{
+  "compilerOptions": {
+    "target": "es5",
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "module": "esnext",
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react",
+    "types": [
+      "socket.io-client"
+    ]
+  },
+  "include": [
+    "src",
+    "index.d.ts"
+  ],
+  "exclude": [
+    "webpack.common.js",
+    "babel.config.js",
+    "postcss.config.js",
+    "prettier.config.js"
+  ],
+  "extends": "./tsconfig.paths.json"
+}
