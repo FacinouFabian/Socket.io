@@ -17,10 +17,9 @@ export default function Register(): JSX.Element {
   const handleJoinParty = () => {
     io.on("game::start", ({ points }: { points: number }) => {
       setPlayer({ nickname, points });
-    });
+    })
 
     io.emit("game::sendNickname", JSON.stringify({ nickname }))
-  
   };
 
   const handleCreateParty = () => {
@@ -40,7 +39,7 @@ export default function Register(): JSX.Element {
               Nickname
             </label>
             <input
-              className="shawod appearance-none border rounded py-2 px-4"
+              className="shadow appearance-none border rounded py-2 px-4"
               placeholder="Sephiroth"
               {...bind}
             />

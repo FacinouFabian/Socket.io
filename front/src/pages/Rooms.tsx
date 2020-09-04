@@ -7,13 +7,16 @@ type Player = {
   points: number
 }
 
+type GameState = "waiting" | "started" | "paused" | "finished"
+
 type Players = Player[]
 
 type Game = {
   id: number,
   beg: string,
   end: string,
-  players: Players
+  players: Players,
+  state: GameState
 }
 
 export default function Rooms(): JSX.Element {
@@ -23,6 +26,7 @@ export default function Rooms(): JSX.Element {
 
   const handleJoin = (roomId: number) => {
     io.emit("game::joinParty", JSON.stringify({ roomId, nickname: user.nickname }))
+    io.emit('game::begin', { roomId })
   };
 
   useEffect(() => {
@@ -31,17 +35,6 @@ export default function Rooms(): JSX.Element {
     io.on('game::rooms', ({ games }: { games: Game[] }) => {
       setRooms(games)
     })
-
-    io.on('game::create', ({ games }: { games: Game[] }) => {
-      setRooms(games)
-      console.log('rooms now')
-      console.log(rooms)
-    })
-
-    io.on('game::join', ({ game }: { game: Game }) => {
-      console.log('Request for')
-      console.log(game)
-    })
   })
 
   return (
@@ -49,7 +42,7 @@ export default function Rooms(): JSX.Element {
       <div className="w-full">
         <ul className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
             { rooms.map((item: Game): JSX.Element | null => {
-                if (item.players.length === 2) {
+                if (item.state != "waiting") {
                     return null
                 } else {
                     return (
@@ -64,12 +57,14 @@ export default function Rooms(): JSX.Element {
                                     </span>
                                 </div>
                                 <div className="border-t border-gray-200">
-                                    <button 
-                                        onClick={(): void => handleJoin(item.id)}
-                                        className="px-4 py-4 sm:px-6 w-full h-full bg-red-800 text-white">
-                                        <Link to="/games">
-                                          Join
-                                        </Link>
+                                    <button
+                                      className="w-full h-full bg-red-800 hover:bg-blue-800 text-white px-4 py-4 sm:px-6"
+                                      type="button"
+                                      onClick={() => handleJoin(item.id)}
+                                    >
+                                      <Link to="/games">
+                                      Join
+                                      </Link>
                                     </button>
                                 </div>
                             </div>
