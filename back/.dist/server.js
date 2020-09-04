@@ -37,37 +37,23 @@ var server = app.listen(port, function () {
 var socketio = (0, _socket["default"])(server);
 var ee = new _events.EventEmitter();
 var users = {};
-var games = [{
-  id: 0,
-  beg: "Test1",
-  end: "Test1",
-  players: [{
-    name: "Goldenee",
-    points: 0,
-    state: "not ready"
-  }],
-  state: "waiting",
-  magicNumber: null
-}, {
-  id: 1,
-  beg: "Test2",
-  end: "Test2",
-  players: [{
-    name: "Majdi",
-    points: 0,
-    state: "not ready"
-  }, {
-    name: "Dylan",
-    points: 0,
-    state: "not ready"
-  }],
-  state: "waiting",
-  magicNumber: null
-}];
+var games = [];
 var room = 0;
+/**
+ * @description Display a message when a connection has been initialised
+ * @return {void}
+*/
+
 socketio.on('connection', function (socket) {
   // CURRENT SOCKET/PLAYER
   (0, _utils.display)(_chalk["default"].cyan("Connection opened for ( ".concat(socket.id, " )")));
+  /* ################################# EXTERNAL EVENTS ################################# */
+
+  /**
+   * @description Display a goodbye message when connection closes
+   * @return {void}
+  */
+
   socket.on('disconnect', function () {
     var _users$socket$id;
 
@@ -78,6 +64,11 @@ socketio.on('connection', function (socket) {
 
     (0, _utils.display)(_chalk["default"].cyan("Connection closed for ( ".concat(socket.id, " )")));
   });
+  /**
+   * @description Set a new user to the Users Array
+   * @return {void}
+  */
+
   socket.on('game::sendNickname', function (payload) {
     var user = JSON.parse(payload);
     var nickname = user.nickname;
@@ -85,18 +76,21 @@ socketio.on('connection', function (socket) {
     users[socket.id] = {
       nickname: nickname
     };
-    /*     socket.emit('game::start', {
-          points: 1337,
-        }) */
   });
+  /**
+   * @description Create a new game for a user (the user will be the owner of the game) (in Register.tsx handleCreateParty)
+   * @return {void}
+  */
+
   socket.on('game::createParty', function (payload) {
     var user = JSON.parse(payload);
     var nickname = user.nickname;
-    (0, _utils.display)(_chalk["default"].green("Challenger : ".concat(nickname, " ( from ").concat(socket.id, " ) created a party!")));
+    (0, _utils.display)(_chalk["default"].green("Challenger : ".concat(nickname, " ( from ").concat(socket.id, " ) created a party!"))); // create a new game with the user
+
     games[room] = {
       id: room,
-      beg: "NEW",
-      end: "NEW",
+      beg: "",
+      end: "",
       players: [{
         name: nickname,
         points: 0,
@@ -105,112 +99,108 @@ socketio.on('connection', function (socket) {
       state: "waiting",
       magicNumber: null
     };
-    (0, _utils.display)(_chalk["default"].red(JSON.stringify(games)));
-    socket.emit('game::create', {
-      games: games
-    });
+    (0, _utils.display)(_chalk["default"].red(JSON.stringify(games))); // increment the index for the next created game
+
     room = room + 1;
   });
+  /**
+   * @description Make a user join a game (in Register.tsx handleJoinParty)
+   * @return {void}
+  */
+
   socket.on('game::joinParty', function (payload) {
     var data = JSON.parse(payload);
     var nickname = data.nickname,
         roomId = data.roomId;
     (0, _utils.display)(_chalk["default"].green("Challenger : ".concat(nickname, " ( from ").concat(socket.id, " ) joined ").concat(games[roomId].players[0].name, "'s party!")));
-    (0, _utils.display)(_chalk["default"].red("".concat(games[roomId].players[0].name, "'s party will start!")));
+    (0, _utils.display)(_chalk["default"].red("".concat(games[roomId].players[0].name, "'s party will start!"))); // add the second user to the game
+
     games[roomId].players.push({
       name: nickname,
       points: 0,
       state: "not ready"
     });
+    ee.emit('game::start', {
+      roomId: roomId
+    });
   });
+  /**
+   * @description Send all games (for Rooms.tsx)
+   * @return {void}
+  */
+
   socket.on('game::getRooms', function () {
     socket.emit('game::rooms', {
       games: games
     });
   });
+  /**
+   * @description Returns a user's game (for Game.tsx)
+   * @return {void}
+  */
+
   socket.on('game::getUserParty', function (payload) {
     var data = JSON.parse(payload);
     var nickname = data.nickname;
+    var userGame = games.find(function (game) {
+      return game.players.find(function (player) {
+        return player.name === nickname;
+      });
+    }); // The player is found in a game
 
-    var _iterator = _createForOfIteratorHelper(games),
-        _step;
-
-    try {
-      for (_iterator.s(); !(_step = _iterator.n()).done;) {
-        var party = _step.value;
-
-        var _iterator2 = _createForOfIteratorHelper(party.players),
-            _step2;
-
-        try {
-          for (_iterator2.s(); !(_step2 = _iterator2.n()).done;) {
-            var player = _step2.value;
-
-            if (player.name === nickname) {
-              socket.emit('game::userParty', {
-                party: party
-              });
-            } else {
-              (0, _utils.display)(_chalk["default"].cyan("Cannot find player ".concat(nickname, " in a game.")));
-            }
-          }
-        } catch (err) {
-          _iterator2.e(err);
-        } finally {
-          _iterator2.f();
-        }
-      }
-    } catch (err) {
-      _iterator.e(err);
-    } finally {
-      _iterator.f();
-    }
+    userGame != undefined ? // send the game
+    socket.emit('game::userParty', {
+      party: userGame
+    }) // the player was not found
+    : (0, _utils.display)(_chalk["default"].cyan("Cannot find player ".concat(nickname, " in a game.")));
   });
+  /**
+   * @description Change a user's state (is he ready to play or not ?)
+   * @return {void}
+  */
+
   socket.on('game::playerState', function (payload) {
     var data = JSON.parse(payload);
     var roomId = data.roomId,
         nickname = data.nickname,
         state = data.state;
-    var game = games[roomId];
+    var game = games[roomId]; // search player
 
-    var _iterator3 = _createForOfIteratorHelper(game.players),
-        _step3;
+    var _iterator = _createForOfIteratorHelper(game.players),
+        _step;
 
     try {
-      for (_iterator3.s(); !(_step3 = _iterator3.n()).done;) {
-        var player = _step3.value;
+      for (_iterator.s(); !(_step = _iterator.n()).done;) {
+        var player = _step.value;
 
+        // if player found
         if (player.name === nickname) {
+          // change player's state 
           player.state = state;
           (0, _utils.display)(_chalk["default"].blue("Player ".concat(player.name, " is ").concat(player.state, ".")));
         }
-      }
+      } // if the game have 2 players
+
     } catch (err) {
-      _iterator3.e(err);
+      _iterator.e(err);
     } finally {
-      _iterator3.f();
+      _iterator.f();
     }
 
     if (game.players.length === 2) {
-      game.players[0].state === "ready" && game.players[1].state === "ready" ? ee.emit('game::start', {
+      // if the 2 players are ready to play
+      game.players[0].state === "ready" && game.players[1].state === "ready" ? //start the game
+      ee.emit('game::start', {
         roomId: roomId
-      }) : (0, _utils.display)(_chalk["default"].yellowBright('Waiting for 2nd player before start.'));
+      }) // else
+      : (0, _utils.display)(_chalk["default"].yellowBright('Waiting for the 2nd player before starting.'));
     }
   });
-  ee.on("game::start", function (payload) {
-    var roomId = payload.roomId;
-    var game = games[roomId];
+  /**
+   * @description Pause a game
+   * @return {void}
+  */
 
-    if (game.players.length === 2) {
-      game.state = "started";
-      game.beg = (0, _moment["default"])().format();
-      (0, _utils.display)(_chalk["default"].greenBright("".concat(game.players[0].name, "'s party has started.")));
-      (0, _utils.display)(_chalk["default"].green("".concat(JSON.stringify(game))));
-      startGame(roomId, socket);
-    } else {
-      (0, _utils.display)(_chalk["default"].redBright("Cannot start ".concat(game.players[0].name, "'s party. Error: Missing player(s)")));
-    }
-  });
   socket.on("game::pause", function (payload) {
     var roomId = payload.roomId,
         nickname = payload.nickname;
@@ -224,60 +214,129 @@ socketio.on('connection', function (socket) {
       (0, _utils.display)(_chalk["default"].redBright("".concat(game.players[0].name, "'s party is already in pause.")));
     }
   });
+  /**
+   * @description Starts a game
+   * @return {void}
+  */
+
   socket.on("game::userMagicNumber", function (payload) {
     var roomId = payload.roomId,
         magicNumber = payload.magicNumber,
         nickname = payload.nickname;
     var game = games[roomId];
-    (0, _utils.display)(_chalk["default"].redBright.underline("Received magic number ".concat(magicNumber, " from ").concat(nickname, ".")));
+    (0, _utils.display)(_chalk["default"].redBright.underline("Received magic number ".concat(magicNumber, " from ").concat(nickname, "."))); // if the magic number is the same as the user response
 
     if (game.magicNumber === magicNumber) {
-      var _iterator4 = _createForOfIteratorHelper(game.players),
-          _step4;
-
-      try {
-        for (_iterator4.s(); !(_step4 = _iterator4.n()).done;) {
-          var player = _step4.value;
-
-          if (player.name === nickname) {
-            player.points = player.points + 1;
-          }
-        }
-      } catch (err) {
-        _iterator4.e(err);
-      } finally {
-        _iterator4.f();
-      }
-
-      socket.emit('game::isMagicNumber', {
-        response: 'Congratulations!✨ you found the magic number. 🔥'
+      // search for the player
+      var player = game.players.find(function (player) {
+        return player.name === nickname;
       });
-      /* ee.emit('game::finish', { roomId })  */
+
+      if (player != undefined) {
+        if (player.points < 3) {
+          player.points = player.points + 1; // tell the player he founded the magic number
+
+          socket.emit('game::isMagicNumber', {
+            roomId: roomId,
+            found: true,
+            player: player === null || player === void 0 ? void 0 : player.name
+          }); // send a new magic number
+
+          sendNewMagicNumber(roomId, socket);
+          (0, _utils.display)(_chalk["default"].yellow.underline("".concat(JSON.stringify(player))));
+        } else {
+          ee.emit('game::finish', {
+            roomId: roomId
+          });
+        }
+      }
     } else {
+      // tell the player he doesn't found the magic number
       socket.emit('game::isMagicNumber', {
-        response: 'Wrong answer!🙊 Try again! 😃'
+        found: false
       });
     }
   });
+  /* ################################# INTERNS EVENTS ################################# */
+
+  /**
+   * @description Start a game
+   * @return {void}
+  */
+
+  ee.on("game::start", function (payload) {
+    var roomId = payload.roomId;
+    var game = games[roomId]; // if the game have 2 players
+
+    if (game.players.length === 2) {
+      game.state = "started";
+      game.beg = (0, _moment["default"])().format();
+      game.players[0].state = "In game";
+      game.players[1].state = "In game";
+      (0, _utils.display)(_chalk["default"].greenBright("".concat(game.players[0].name, "'s party has started.")));
+      (0, _utils.display)(_chalk["default"].green("".concat(JSON.stringify(game)))); // start the game
+
+      startGame(roomId, socket);
+    } else {
+      (0, _utils.display)(_chalk["default"].redBright("Cannot start ".concat(game.players[0].name, "'s party. Error: Missing player(s)")));
+    }
+  });
+  /**
+   * @description Finish a game and display ranking
+   * @return {void}
+  */
+
   ee.on("game::finish", function (payload) {
     var roomId = payload.roomId;
-    var game = games[roomId];
-    game.state = "finished";
-    game.end = (0, _moment["default"])().format();
+    var game = games[roomId]; // sort players by points
+
     var ranking = game.players.sort(function (player1, player2) {
-      return player1.points > player2.points ? 1 : -1;
+      return player2.points - player1.points;
     });
     var winner = ranking[0];
+    game.state = "finished";
+    game.players.map(function (player) {
+      player.state = "not ready";
+    });
+    game.end = (0, _moment["default"])().format(); // display game results
+
     (0, _utils.display)(_chalk["default"].greenBright("".concat(game.players[0].name, "'s party has finished.")));
     (0, _utils.display)(_chalk["default"].white("".concat(winner.name, " won with ").concat(winner.points, " points !")));
-    (0, _utils.display)(_chalk["default"].magenta("Ranking : ".concat(JSON.stringify(ranking))));
+    (0, _utils.display)(_chalk["default"].magenta("Game : ".concat(JSON.stringify(game))));
+    endGame(roomId, socket, ranking);
   });
-}); // functions
+});
+/* ################################# FUNCTIONS ################################# */
 
 var startGame = function startGame(roomId, socket) {
-  var magicNumber = Math.floor(Math.random() * Math.floor(1337));
+  var magicNumber = Math.floor(Math.random() * Math.floor(5));
+  games[roomId].magicNumber = magicNumber;
+  (0, _utils.display)(_chalk["default"].blue("".concat(magicNumber, " is the magic number.")));
   socket.emit('game::magicNumber', {
     roomId: roomId,
     magicNumber: magicNumber
+  });
+  socket.emit('game::gameStart', {
+    roomId: roomId
+  });
+};
+
+var sendNewMagicNumber = function sendNewMagicNumber(roomId, socket) {
+  var magicNumber = Math.floor(Math.random() * Math.floor(5));
+  games[roomId].magicNumber = magicNumber;
+  (0, _utils.display)(_chalk["default"].magenta("".concat(magicNumber, " is the new magic number.")));
+  socket.emit('game::magicNumber', {
+    roomId: roomId,
+    magicNumber: magicNumber
+  });
+  socket.emit('game::nextStep', {
+    roomId: roomId
+  });
+};
+
+var endGame = function endGame(roomId, socket, ranking) {
+  socket.emit('game::gameFinish', {
+    roomId: roomId,
+    ranking: ranking
   });
 };

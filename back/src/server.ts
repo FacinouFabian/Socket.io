@@ -23,7 +23,7 @@ interface UserAnswer {
 
 type GameState = "waiting" | "started" | "paused" | "finished"
 
-type PlayerState = "ready" | "not ready"
+type PlayerState = "ready" | "not ready" | "In game"
 
 type Player = {
   name: string,
@@ -59,10 +59,7 @@ const socketio = io(server)
 const ee = new EventEmitter()
 
 const users: Record<string, User> = {}
-const games: Game[] = [
-  { id: 0, beg: "Test1", end: "Test1", players: [{name: "Goldenee", points: 0, state: "not ready"}], state: "waiting", magicNumber: null },
-  { id: 1, beg: "Test2", end: "Test2", players: [{name: "Majdi", points: 0, state: "not ready"}, {name: "Dylan", points: 0, state: "not ready"}], state: "waiting", magicNumber: null }
-]
+const games: Game[] = []
 let room: number = 0
 
 /**
@@ -150,6 +147,8 @@ socketio.on('connection', (socket: Socket) => {
         state: "not ready"
       }
     )
+
+    ee.emit('game::start', { roomId }) 
   })
 
   /**
@@ -170,21 +169,14 @@ socketio.on('connection', (socket: Socket) => {
     const data = JSON.parse(payload)
     const { nickname }: User = data
 
-    // search game
-    for (const party of games) {
-      // search player
-      for (const player of party.players) {
-        // if the player is found in a game
-        if (player.name === nickname) {
-          // send the game
-          socket.emit('game::userParty', { party })
-        } 
-        else {
-          // the player was not found
-          display(chalk.cyan(`Cannot find player ${nickname} in a game.`))
-        }
-      }
-    }
+    let userGame = games.find(game => game.players.find(player => player.name === nickname))
+
+    // The player is found in a game
+    userGame != undefined ? 
+    // send the game
+    socket.emit('game::userParty', { party: userGame })
+    // the player was not found
+    : display(chalk.cyan(`Cannot find player ${nickname} in a game.`))
   })
 
   /**
@@ -248,25 +240,32 @@ socketio.on('connection', (socket: Socket) => {
     // if the magic number is the same as the user response
     if (game.magicNumber === magicNumber) {
       // search for the player
-      for (const player of game.players) {
-        // if player found
-        if (player.name === nickname) {
-          // add +1 to the player's points
-          player.points = player.points + 1
-        }
-      }
+      let player = game.players.find(player => player.name === nickname)
 
-      // tell the player he founded the magic number
-      socket.emit('game::isMagicNumber', { 
-        response: 'Congratulations!✨ you found the magic number. 🔥' 
-      })
-      
-      /* ee.emit('game::finish', { roomId })  */
+      if (player != undefined) {
+        if (player.points < 3){
+          player.points = player.points + 1
+
+          // tell the player he founded the magic number
+          socket.emit('game::isMagicNumber', {
+            roomId, 
+            found: true,
+            player: player?.name,
+          })
+
+          // send a new magic number
+          sendNewMagicNumber(roomId, socket)
+
+          display(chalk.yellow.underline(`${JSON.stringify(player)}`))
+        } else {
+          ee.emit('game::finish', { roomId }) 
+        }
+      }  
     }
     else {
       // tell the player he doesn't found the magic number
       socket.emit('game::isMagicNumber', { 
-        response: 'Wrong answer!🙊 Try again! 😃' 
+        found: false,
       }) 
     }
   })
@@ -286,6 +285,8 @@ socketio.on('connection', (socket: Socket) => {
       game.state = "started"
       game.beg = moment().format() 
 
+      game.players[0].state = "In game"
+      game.players[1].state = "In game"
       display(chalk.greenBright(`${game.players[0].name}'s party has started.`))
       display(chalk.green(`${JSON.stringify(game)}`))
 
@@ -305,16 +306,22 @@ socketio.on('connection', (socket: Socket) => {
     const { roomId }: Room = payload
     const game: Game = games[roomId]
     // sort players by points
-    const ranking = game.players.sort((player1: Player, player2: Player) => (player1.points > player2.points) ? 1 : -1)
+    const ranking = game.players.sort((player1: Player, player2: Player) => {
+      return player2.points - player1.points
+    })
     const winner: Player = ranking[0]
 
     game.state = "finished"
+    game.players.map( player => {
+      player.state = "not ready"
+    })
     game.end = moment().format()
     
     // display game results
     display(chalk.greenBright(`${game.players[0].name}'s party has finished.`))
     display(chalk.white(`${winner.name} won with ${winner.points} points !`))
-    display(chalk.magenta(`Ranking : ${JSON.stringify(ranking)}`))
+    display(chalk.magenta(`Game : ${JSON.stringify(game)}`))
+    endGame(roomId, socket, ranking)
   })
 
 })
@@ -322,6 +329,21 @@ socketio.on('connection', (socket: Socket) => {
 /* ################################# FUNCTIONS ################################# */
 
 const startGame = (roomId: number, socket: Socket): void => {
-  const magicNumber: number =  Math.floor(Math.random() * Math.floor(1337))
+  const magicNumber: number =  Math.floor(Math.random() * Math.floor(5))
+  games[roomId].magicNumber = magicNumber
+  display(chalk.blue(`${magicNumber} is the magic number.`))
   socket.emit('game::magicNumber', { roomId, magicNumber }) 
+  socket.emit('game::gameStart', { roomId }) 
+}
+
+const sendNewMagicNumber = (roomId: number, socket: Socket): void => {
+  const magicNumber: number =  Math.floor(Math.random() * Math.floor(5))
+  games[roomId].magicNumber = magicNumber
+  display(chalk.magenta(`${magicNumber} is the new magic number.`))
+  socket.emit('game::magicNumber', { roomId, magicNumber }) 
+  socket.emit('game::nextStep', { roomId }) 
+}
+
+const endGame = (roomId: number, socket: Socket, ranking: any): void => {
+  socket.emit('game::gameFinish', { roomId, ranking })
 }
