@@ -93,51 +93,105 @@ export default function Game(): JSX.Element {
         <div className="w-full flex flex-col items-center justify-center">
             <div>
               <div>
-                {(game.players[0]) ? 
-                  <ul>
-                    <li className="font-bold">
-                      {game.players[0].name}
-                    </li>
-                    <li>
-                      Points: <span className="font-bold">{game.players[0].points}</span>
-                    </li>
-                    <li className={`
-                      inline-flex items-center px-3 py-0.5 rounded-full text-sm font-medium leading-5
-                      ${game.players[0].state === "ready" ? 
-                      'bg-green-100 text-green-800'
-                      : game.players[0].state === "not ready" ? 
-                      'bg-red-100 text-red-800'
-                      : 'bg-purple-800 text-white'
-                      }
-                    `}>
-                      {game.players[0].state}
-                    </li>
-                  </ul> 
-                  : 
-                  ''
+                {(game.players[0]) ?
+                  <div className="mb-4">
+                    <div>
+                      <div className="relative">
+                        <div className="absolute inset-0 h-1/2 bg-gray-50"></div>
+                        <div className="relative max-w-screen-xl mx-auto px-4 sm:px-6 lg:px-8">
+                          <div className="max-w-4xl mx-auto">
+                            <dl className="rounded-lg bg-white shadow-lg sm:grid sm:grid-cols-3">
+                              <div className="flex flex-col border-b border-gray-100 p-6 text-center sm:border-0 sm:border-r">
+                                <dt className="order-2 mt-2 text-lg leading-6 font-medium text-gray-500" id="item-1">
+                                  Player
+                                </dt>
+                                <dd className="order-1 text-5xl leading-none font-extrabold text-indigo-600" aria-describedby="item-1">
+                                  {game.players[0].name}
+                                </dd>
+                              </div>
+                              <div className="flex flex-col border-t border-b border-gray-100 p-6 text-center sm:border-0 sm:border-l sm:border-r">
+                                <dt className="order-2 mt-2 text-lg leading-6 font-medium text-gray-500">
+                                  Points
+                                </dt>
+                                <dd className="order-1 text-5xl leading-none font-extrabold text-indigo-600">
+                                  {game.players[0].points}
+                                </dd>
+                              </div>
+                              <div className="flex flex-col border-t border-gray-100 p-6 text-center sm:border-0 sm:border-l">
+                                <dt className="order-2 mt-2 text-lg leading-6 font-medium text-gray-500">
+                                  State
+                                </dt>
+                                <dd className="order-1 text-5xl leading-none font-extrabold text-indigo-600">
+                                    <span className={`
+                                        inline-flex items-center px-3 py-0.5 rounded-full text-sm font-medium leading-5
+                                        ${game.players[0].state === "ready" ? 
+                                        'bg-green-100 text-green-800'
+                                        : game.players[0].state === "not ready" ? 
+                                        'bg-red-100 text-red-800'
+                                        : 'bg-purple-800 text-white'
+                                        }
+                                      `}>
+                                        {game.players[0].state}
+                                    </span>
+                                </dd>
+                              </div>
+                            </dl>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  : ''
                 }
-                {(game.players[1]) ? 
-                  <ul>
-                    <li className="font-bold">
-                      {game.players[1].name}
-                    </li>
-                    <li>
-                      Points: <span className="font-bold">{game.players[1].points}</span>
-                    </li>
-                    <li className={`
-                      inline-flex items-center px-3 py-0.5 rounded-full text-sm font-medium leading-5
-                      ${game.players[1].state === "ready" ? 
-                      'bg-green-100 text-green-800'
-                      : game.players[1].state === "not ready" ? 
-                      'bg-red-100 text-red-800'
-                      : 'bg-purple-800 text-white'
-                      }
-                    `}>
-                      {game.players[0].state}
-                    </li>
-                  </ul> 
-                  : 
-                  ''
+                {(game.players[1]) ?
+                  <div>
+                    <div>
+                      <div className="relative">
+                        <div className="absolute inset-0 h-1/2 bg-gray-50"></div>
+                        <div className="relative max-w-screen-xl mx-auto px-4 sm:px-6 lg:px-8">
+                          <div className="max-w-4xl mx-auto">
+                            <dl className="rounded-lg bg-white shadow-lg sm:grid sm:grid-cols-3">
+                              <div className="flex flex-col border-b border-gray-100 p-6 text-center sm:border-0 sm:border-r">
+                                <dt className="order-2 mt-2 text-lg leading-6 font-medium text-gray-500" id="item-1">
+                                  Player
+                                </dt>
+                                <dd className="order-1 text-5xl leading-none font-extrabold text-indigo-600" aria-describedby="item-1">
+                                  {game.players[1].name}
+                                </dd>
+                              </div>
+                              <div className="flex flex-col border-t border-b border-gray-100 p-6 text-center sm:border-0 sm:border-l sm:border-r">
+                                <dt className="order-2 mt-2 text-lg leading-6 font-medium text-gray-500">
+                                  Points
+                                </dt>
+                                <dd className="order-1 text-5xl leading-none font-extrabold text-indigo-600">
+                                  {game.players[1].points}
+                                </dd>
+                              </div>
+                              <div className="flex flex-col border-t border-gray-100 p-6 text-center sm:border-0 sm:border-l">
+                                <dt className="order-2 mt-2 text-lg leading-6 font-medium text-gray-500">
+                                  State
+                                </dt>
+                                <dd className="order-1 text-5xl leading-none font-extrabold text-indigo-600">
+                                    <span className={`
+                                        inline-flex items-center px-3 py-0.5 rounded-full text-sm font-medium leading-5
+                                        ${game.players[1].state === "ready" ? 
+                                        'bg-green-100 text-green-800'
+                                        : game.players[1].state === "not ready" ? 
+                                        'bg-red-100 text-red-800'
+                                        : 'bg-purple-800 text-white'
+                                        }
+                                      `}>
+                                        {game.players[1].state}
+                                    </span>
+                                </dd>
+                              </div>
+                            </dl>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  : ''
                 }
               </div>
             </div>
@@ -149,28 +203,31 @@ export default function Game(): JSX.Element {
             </div>
 
             <div>
-              <form className="bg-white shadow-md rounded-lg px-8 py-8 m-4">
-                <div className="flex flex-col items-center justify-center mb-4">
-                  <label className="block text-black text-md font-bold mb-2">
-                    Magic Number 
-                  </label>
-                  <input
-                    className="shadow appearance-none border rounded py-2 px-4"
-                    placeholder="Magic Number..."
-                    value={value}
-                    onChange={(event: React.ChangeEvent<HTMLInputElement>): void => setValue(event.target.value)}
-                  />
-                </div>
-                <div className="flex flex-col items-center justify-between w-full">
-                  <button
-                    className="bg-blue-800 hover:bg-red-800 text-white px-6 py-2 rounded-md"
-                    type="button"
-                    onClick={() => sendMagicNumber()}
-                  >
-                    Send
-                  </button>
-                </div>
-              </form>
+              { (game.players.length === 2) ? 
+                <form className="bg-white shadow-md rounded-lg px-8 py-8">
+                  <div className="flex flex-col items-center justify-center mb-4">
+                    <label className="block text-black text-md font-bold mb-2">
+                      Magic Number 
+                    </label>
+                    <input
+                      className="shadow appearance-none border rounded py-2 px-4"
+                      placeholder="Magic Number..."
+                      value={value}
+                      onChange={(event: React.ChangeEvent<HTMLInputElement>): void => setValue(event.target.value)}
+                    />
+                  </div>
+                  <div className="flex flex-col items-center justify-between w-full">
+                    <button
+                      className="bg-blue-800 hover:bg-red-800 text-white px-6 py-2 rounded-md"
+                      type="button"
+                      onClick={() => sendMagicNumber()}
+                    >
+                      Send
+                    </button>
+                  </div>
+                </form>
+                : ''
+              }
 
               <div className="fixed bottom-0 inset-x-0 pb-2 sm:pb-5">
                 <div className="max-w-screen-xl mx-auto px-2 sm:px-6 lg:px-8">
@@ -200,6 +257,9 @@ export default function Game(): JSX.Element {
                                 <strong className="p-2 bg-indigo-800 text-white rounded-md">{scores[0].name}</strong>
                                 {' '}Won with {scores[0].points} 🔥
                               </span>
+                            :
+                            game.players.length === 1 ?
+                              <span>We're waiting for a 2nd player 😃</span>
                             :
                               <span>Good luck ! 😃</span>
                           }

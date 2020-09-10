@@ -39,7 +39,10 @@ type Game = {
   end: string,
   players: Players,
   state: GameState,
-  magicNumber: number | null
+  haveBeenStarted: boolean,
+  isEnded: boolean,
+  magicNumber: number | null,
+  round: number
 }
 
 // prelude -- loading environment variable
@@ -119,11 +122,11 @@ socketio.on('connection', (socket: Socket) => {
           state: "not ready"
         }
       ], 
-      state: "waiting", magicNumber: null 
+      state: "waiting", magicNumber: null,
+      haveBeenStarted: false,
+      isEnded: false,
+      round: 0
     }
-
-    display(chalk.red(JSON.stringify(games)))
-
     // increment the index for the next created game
     room = room + 1
   })
@@ -220,7 +223,6 @@ socketio.on('connection', (socket: Socket) => {
     if (game.state != "paused") {
       game.state = "paused"
       display(chalk.greenBright(`${game.players[0].name}'s party has been paused by ${nickname}.`))
-      display(chalk.green(`${JSON.stringify(game)}`))
     }
     else {
       display(chalk.redBright(`${game.players[0].name}'s party is already in pause.`))
@@ -234,16 +236,19 @@ socketio.on('connection', (socket: Socket) => {
   socket.on("game::userMagicNumber", payload => {
     const { roomId, magicNumber, nickname }: UserAnswer = payload
     const game: Game = games[roomId]
+    // search for the player
+    let player = game.players.find(player => player.name === nickname)
 
     display(chalk.redBright.underline(`Received magic number ${magicNumber} from ${nickname}.`))
 
-    // if the magic number is the same as the user response
-    if (game.magicNumber === magicNumber) {
-      // search for the player
-      let player = game.players.find(player => player.name === nickname)
+    display(chalk.red.underline(`Round: ${game.round}`))
 
-      if (player != undefined) {
-        if (player.points < 3){
+    // if the current round is less than 3
+    if (game.round < 3) {
+      // if the magic number is the same as the user response
+      if (game.magicNumber === magicNumber) {
+        if (player != undefined) {
+          // increment player's points
           player.points = player.points + 1
 
           // tell the player he founded the magic number
@@ -256,17 +261,28 @@ socketio.on('connection', (socket: Socket) => {
           // send a new magic number
           sendNewMagicNumber(roomId, socket)
 
-          display(chalk.yellow.underline(`${JSON.stringify(player)}`))
-        } else {
+          // start next round
+          game.round = game.round + 1
+        }  
+      }
+      else {
+        // tell the player he doesn't found the magic number
+        socket.emit('game::isMagicNumber', { 
+          found: false,
+        }) 
+      }
+    }
+    // if the current round is 3
+    else {
+      // magic number founded
+      if (game.magicNumber === magicNumber){
+        // player founded
+        if (player != undefined){
+          // increment player's points and finish the game
+          player.points = player.points + 1
           ee.emit('game::finish', { roomId }) 
         }
-      }  
-    }
-    else {
-      // tell the player he doesn't found the magic number
-      socket.emit('game::isMagicNumber', { 
-        found: false,
-      }) 
+      }
     }
   })
 
@@ -280,21 +296,25 @@ socketio.on('connection', (socket: Socket) => {
     const { roomId }: Room = payload
     const game: Game = games[roomId]
 
-    // if the game have 2 players
-    if (game.players.length === 2) {
-      game.state = "started"
-      game.beg = moment().format() 
+    game.round = 1
 
-      game.players[0].state = "In game"
-      game.players[1].state = "In game"
-      display(chalk.greenBright(`${game.players[0].name}'s party has started.`))
-      display(chalk.green(`${JSON.stringify(game)}`))
+    if (game.haveBeenStarted === false) {
+      // if the game have 2 players
+      if (game.players.length === 2) {
+        game.state = "started"
+        game.haveBeenStarted = true
+        game.beg = moment().format() 
 
-      // start the game
-      startGame(roomId, socket)
-    }
-    else {
-      display(chalk.redBright(`Cannot start ${game.players[0].name}'s party. Error: Missing player(s)`))
+        game.players[0].state = "In game"
+        game.players[1].state = "In game"
+        display(chalk.greenBright(`${game.players[0].name}'s party has started.`))
+
+        // start the game
+        startGame(roomId, socket)
+      }
+      else {
+        display(chalk.redBright(`Cannot start ${game.players[0].name}'s party. Error: Missing player(s)`))
+      }
     }
   })
 
@@ -305,23 +325,29 @@ socketio.on('connection', (socket: Socket) => {
   ee.on("game::finish", payload => {
     const { roomId }: Room = payload
     const game: Game = games[roomId]
-    // sort players by points
-    const ranking = game.players.sort((player1: Player, player2: Player) => {
-      return player2.points - player1.points
-    })
-    const winner: Player = ranking[0]
-
-    game.state = "finished"
-    game.players.map( player => {
-      player.state = "not ready"
-    })
-    game.end = moment().format()
     
-    // display game results
-    display(chalk.greenBright(`${game.players[0].name}'s party has finished.`))
-    display(chalk.white(`${winner.name} won with ${winner.points} points !`))
-    display(chalk.magenta(`Game : ${JSON.stringify(game)}`))
-    endGame(roomId, socket, ranking)
+    if (game.isEnded === false) {
+      game.isEnded = true
+
+      // sort players by points
+      const ranking = game.players.sort((player1: Player, player2: Player) => {
+        return player2.points - player1.points
+      })
+
+      const winner: Player = ranking[0]
+
+      game.state = "finished"
+      game.players.map( player => {
+        player.state = "not ready"
+      })
+      game.end = moment().format()
+      
+      // display game results
+      display(chalk.greenBright(`${game.players[0].name}'s party has finished.`))
+      display(chalk.white(`${winner.name} won with ${winner.points} points !`))
+
+      endGame(roomId, socket, ranking)
+    }
   })
 
 })

@@ -97,9 +97,11 @@ socketio.on('connection', function (socket) {
         state: "not ready"
       }],
       state: "waiting",
-      magicNumber: null
-    };
-    (0, _utils.display)(_chalk["default"].red(JSON.stringify(games))); // increment the index for the next created game
+      magicNumber: null,
+      haveBeenStarted: false,
+      isEnded: false,
+      round: 0
+    }; // increment the index for the next created game
 
     room = room + 1;
   });
@@ -209,7 +211,6 @@ socketio.on('connection', function (socket) {
     if (game.state != "paused") {
       game.state = "paused";
       (0, _utils.display)(_chalk["default"].greenBright("".concat(game.players[0].name, "'s party has been paused by ").concat(nickname, ".")));
-      (0, _utils.display)(_chalk["default"].green("".concat(JSON.stringify(game))));
     } else {
       (0, _utils.display)(_chalk["default"].redBright("".concat(game.players[0].name, "'s party is already in pause.")));
     }
@@ -223,17 +224,18 @@ socketio.on('connection', function (socket) {
     var roomId = payload.roomId,
         magicNumber = payload.magicNumber,
         nickname = payload.nickname;
-    var game = games[roomId];
-    (0, _utils.display)(_chalk["default"].redBright.underline("Received magic number ".concat(magicNumber, " from ").concat(nickname, "."))); // if the magic number is the same as the user response
+    var game = games[roomId]; // search for the player
 
-    if (game.magicNumber === magicNumber) {
-      // search for the player
-      var player = game.players.find(function (player) {
-        return player.name === nickname;
-      });
+    var player = game.players.find(function (player) {
+      return player.name === nickname;
+    });
+    (0, _utils.display)(_chalk["default"].redBright.underline("Received magic number ".concat(magicNumber, " from ").concat(nickname, ".")));
+    (0, _utils.display)(_chalk["default"].red.underline("Round: ".concat(game.round)));
 
-      if (player != undefined) {
-        if (player.points < 3) {
+    if (game.round < 3) {
+      // if the magic number is the same as the user response
+      if (game.magicNumber === magicNumber) {
+        if (player != undefined) {
           player.points = player.points + 1; // tell the player he founded the magic number
 
           socket.emit('game::isMagicNumber', {
@@ -243,18 +245,23 @@ socketio.on('connection', function (socket) {
           }); // send a new magic number
 
           sendNewMagicNumber(roomId, socket);
-          (0, _utils.display)(_chalk["default"].yellow.underline("".concat(JSON.stringify(player))));
-        } else {
+          game.round = game.round + 1;
+        }
+      } else {
+        // tell the player he doesn't found the magic number
+        socket.emit('game::isMagicNumber', {
+          found: false
+        });
+      }
+    } else {
+      if (game.magicNumber === magicNumber) {
+        if (player != undefined) {
+          player.points = player.points + 1;
           ee.emit('game::finish', {
             roomId: roomId
           });
         }
       }
-    } else {
-      // tell the player he doesn't found the magic number
-      socket.emit('game::isMagicNumber', {
-        found: false
-      });
     }
   });
   /* ################################# INTERNS EVENTS ################################# */
@@ -266,19 +273,23 @@ socketio.on('connection', function (socket) {
 
   ee.on("game::start", function (payload) {
     var roomId = payload.roomId;
-    var game = games[roomId]; // if the game have 2 players
+    var game = games[roomId];
+    game.round = 1;
 
-    if (game.players.length === 2) {
-      game.state = "started";
-      game.beg = (0, _moment["default"])().format();
-      game.players[0].state = "In game";
-      game.players[1].state = "In game";
-      (0, _utils.display)(_chalk["default"].greenBright("".concat(game.players[0].name, "'s party has started.")));
-      (0, _utils.display)(_chalk["default"].green("".concat(JSON.stringify(game)))); // start the game
+    if (game.haveBeenStarted === false) {
+      // if the game have 2 players
+      if (game.players.length === 2) {
+        game.state = "started";
+        game.haveBeenStarted = true;
+        game.beg = (0, _moment["default"])().format();
+        game.players[0].state = "In game";
+        game.players[1].state = "In game";
+        (0, _utils.display)(_chalk["default"].greenBright("".concat(game.players[0].name, "'s party has started."))); // start the game
 
-      startGame(roomId, socket);
-    } else {
-      (0, _utils.display)(_chalk["default"].redBright("Cannot start ".concat(game.players[0].name, "'s party. Error: Missing player(s)")));
+        startGame(roomId, socket);
+      } else {
+        (0, _utils.display)(_chalk["default"].redBright("Cannot start ".concat(game.players[0].name, "'s party. Error: Missing player(s)")));
+      }
     }
   });
   /**
@@ -288,22 +299,25 @@ socketio.on('connection', function (socket) {
 
   ee.on("game::finish", function (payload) {
     var roomId = payload.roomId;
-    var game = games[roomId]; // sort players by points
+    var game = games[roomId];
 
-    var ranking = game.players.sort(function (player1, player2) {
-      return player2.points - player1.points;
-    });
-    var winner = ranking[0];
-    game.state = "finished";
-    game.players.map(function (player) {
-      player.state = "not ready";
-    });
-    game.end = (0, _moment["default"])().format(); // display game results
+    if (game.isEnded === false) {
+      game.isEnded = true; // sort players by points
 
-    (0, _utils.display)(_chalk["default"].greenBright("".concat(game.players[0].name, "'s party has finished.")));
-    (0, _utils.display)(_chalk["default"].white("".concat(winner.name, " won with ").concat(winner.points, " points !")));
-    (0, _utils.display)(_chalk["default"].magenta("Game : ".concat(JSON.stringify(game))));
-    endGame(roomId, socket, ranking);
+      var ranking = game.players.sort(function (player1, player2) {
+        return player2.points - player1.points;
+      });
+      var winner = ranking[0];
+      game.state = "finished";
+      game.players.map(function (player) {
+        player.state = "not ready";
+      });
+      game.end = (0, _moment["default"])().format(); // display game results
+
+      (0, _utils.display)(_chalk["default"].greenBright("".concat(game.players[0].name, "'s party has finished.")));
+      (0, _utils.display)(_chalk["default"].white("".concat(winner.name, " won with ").concat(winner.points, " points !")));
+      endGame(roomId, socket, ranking);
+    }
   });
 });
 /* ################################# FUNCTIONS ################################# */
