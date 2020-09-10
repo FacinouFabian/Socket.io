@@ -12,7 +12,7 @@ export default function Register(): JSX.Element {
   const [player, setPlayer] = useState<Player>();
   const { value: nickname, bind } = useInput();
   const [user, dispatch] = useUser()
-  const { io } = user
+  const { io, gameType } = user
 
   const handleJoinParty = () => {
     io.on("game::start", ({ points }: { points: number }) => {
@@ -59,7 +59,8 @@ export default function Register(): JSX.Element {
               type="button"
               onClick={() => handleCreateParty()}
             >
-              <Link to="/games">
+              {/* Will be changed */}
+              <Link to={gameType === 'MagicNumber' ? "/games" : gameType === 'QuickWord' ? "/games" : "/games"}>
                 Send and create a party
               </Link>
             </button>

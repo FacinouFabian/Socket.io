@@ -52,6 +52,18 @@ type Game = {
   likes: number
 }
 
+interface GamesObject {
+  MagicNumber: Game[],
+  QuickWord: Game[],
+  WordAndFurious: Game[]
+}
+
+const gamesObject: GamesObject = {
+  MagicNumber: [],
+  QuickWord: [],
+  WordAndFurious: []
+}
+
 // prelude -- loading environment variable
 dotenv.config()
 if (isNull(process.env.PORT)) {
@@ -132,12 +144,31 @@ socketio.on('connection', (socket: Socket) => {
    * @return {void}
   */
   socket.on('game::createParty', payload => {
-    const user = JSON.parse(payload)
+    const data = JSON.parse(payload)
+    const { user, type } = data
     const { nickname }: User = user
 
     display(chalk.green(`Challenger : ${nickname} ( from ${socket.id} ) created a party!`))
 
-    // create a new game with the user
+    // create a new game with the user (the update)
+    gamesObject[type[room]] = {
+      id: room, 
+      beg: "", 
+      end: "", 
+      players: [
+        {
+          name: nickname, 
+          points: 0, 
+          state: "not ready"
+        }
+      ],
+      state: "waiting", magicNumber: null,
+      haveBeenStarted: false,
+      isEnded: false,
+      round: 0
+    }
+
+    // create a new game with the user (will be update)
     partys[room] = { 
       id: room, 
       beg: "", 
@@ -164,10 +195,19 @@ socketio.on('connection', (socket: Socket) => {
   */
   socket.on('game::joinParty', payload => {
     const data = JSON.parse(payload)
-    const { nickname, roomId }: { nickname: string, roomId: number } = data
+    const { nickname, roomId, type }: { nickname: string, roomId: number, type: string } = data
 
     display(chalk.green(`Challenger : ${nickname} ( from ${socket.id} ) joined ${partys[roomId].players[0].name}'s party!`))
     display(chalk.red(`${partys[roomId].players[0].name}'s party will start!`))
+
+    // add the second user to the game
+    gamesObject[type[roomId]].players.push(
+      {
+        name: nickname, 
+        points: 0, 
+        state: "not ready"
+      }
+    )
 
     // add the second user to the game
     partys[roomId].players.push(
@@ -331,7 +371,10 @@ socketio.on('connection', (socket: Socket) => {
   */
   ee.on("game::start", payload => {
     const { roomId }: Room = payload
+    const { type }: any = payload
     const game: Party = partys[roomId]
+
+    const newGame = gamesObject[type[roomId]]
 
     game.round = 1
 

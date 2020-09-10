@@ -4,18 +4,21 @@ import React, {
     useContext,
     Dispatch,
   } from 'react'
-import SocketIo from "socket.io-client";
+import SocketIo from "socket.io-client"
 
 const io: SocketIOClient.Socket = SocketIo(process.env.REACT_APP_HOSTNAME as string)
+
+type GameType = undefined | 'MagicNumber' | 'QuickWord' | 'WordAndFurious'
 
   // User type definition
   type State = {
     nickname?: string,
-    io: SocketIOClient.Socket
+    io: SocketIOClient.Socket,
+    gameType: GameType
   }
   
   // All user action
-  type Action = { type: 'UPDATE_USERNAME'; payload?: Partial<State> }
+  type Action = { type: 'UPDATE_USERNAME' | 'UPDATE_GAMETYPE'; payload?: Partial<State> }
   
   type ContextProps = [State, Dispatch<Action>]
   
@@ -58,7 +61,8 @@ const io: SocketIOClient.Socket = SocketIo(process.env.REACT_APP_HOSTNAME as str
   export default {
     initialState: {
       nickname: undefined,
-      io: SocketIo(process.env.REACT_APP_HOSTNAME as string)
+      io: SocketIo(process.env.REACT_APP_HOSTNAME as string),
+      gameType: undefined
     },
     /**
      * @description designing the user state shape
@@ -71,6 +75,11 @@ const io: SocketIOClient.Socket = SocketIo(process.env.REACT_APP_HOSTNAME as str
           return {
             ...state,
             nickname: action?.payload?.nickname,
+          }
+        case 'UPDATE_GAMETYPE':
+          return {
+            ...state,
+            gameType: action?.payload?.gameType,
           }
         default:
           return state
