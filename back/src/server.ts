@@ -21,7 +21,7 @@ interface UserAnswer {
   nickname: string
 }
 
-type GameState = "waiting" | "started" | "paused" | "finished"
+type partystate = "waiting" | "started" | "paused" | "finished"
 
 type PlayerState = "ready" | "not ready" | "In game"
 
@@ -33,16 +33,23 @@ type Player = {
 
 type Players = Player[]
 
-type Game = {
+type Party = {
   id: number | null,
   beg: string,
   end: string,
   players: Players,
-  state: GameState,
+  state: partystate,
   haveBeenStarted: boolean,
   isEnded: boolean,
   magicNumber: number | null,
   round: number
+}
+
+type Game = {
+  id: number,
+  name: string,
+  description: string,
+  likes: number
 }
 
 // prelude -- loading environment variable
@@ -62,7 +69,27 @@ const socketio = io(server)
 const ee = new EventEmitter()
 
 const users: Record<string, User> = {}
-const games: Game[] = []
+const partys: Party[] = []
+const games: Game[] = [
+  {
+    id: 0,
+    name: 'MagicNumber',
+    description: 'MagicNumber Game',
+    likes: 72
+  },
+  {
+    id: 1,
+    name: 'QuickWord',
+    description: 'QuickWord Game',
+    likes: 100
+  },
+  {
+    id: 3,
+    name: 'WordAndFurious',
+    description: 'WordAndFurious Game',
+    likes: 56
+  }
+]
 let room: number = 0
 
 /**
@@ -111,7 +138,7 @@ socketio.on('connection', (socket: Socket) => {
     display(chalk.green(`Challenger : ${nickname} ( from ${socket.id} ) created a party!`))
 
     // create a new game with the user
-    games[room] = { 
+    partys[room] = { 
       id: room, 
       beg: "", 
       end: "", 
@@ -139,11 +166,11 @@ socketio.on('connection', (socket: Socket) => {
     const data = JSON.parse(payload)
     const { nickname, roomId }: { nickname: string, roomId: number } = data
 
-    display(chalk.green(`Challenger : ${nickname} ( from ${socket.id} ) joined ${games[roomId].players[0].name}'s party!`))
-    display(chalk.red(`${games[roomId].players[0].name}'s party will start!`))
+    display(chalk.green(`Challenger : ${nickname} ( from ${socket.id} ) joined ${partys[roomId].players[0].name}'s party!`))
+    display(chalk.red(`${partys[roomId].players[0].name}'s party will start!`))
 
     // add the second user to the game
-    games[roomId].players.push(
+    partys[roomId].players.push(
       {
         name: nickname, 
         points: 0, 
@@ -155,11 +182,21 @@ socketio.on('connection', (socket: Socket) => {
   })
 
   /**
-   * @description Send all games (for Rooms.tsx)
+   * @description Send all partys (for Rooms.tsx)
    * @return {void}
   */
   socket.on('game::getRooms', () => {
     socket.emit('game::rooms', {
+      partys,
+    })
+  })
+
+  /**
+   * @description Send all partys (for Rooms.tsx)
+   * @return {void}
+  */
+  socket.on('hub::getGames', () => {
+    socket.emit('hub::sendGames', {
       games,
     })
   })
@@ -172,7 +209,7 @@ socketio.on('connection', (socket: Socket) => {
     const data = JSON.parse(payload)
     const { nickname }: User = data
 
-    let userGame = games.find(game => game.players.find(player => player.name === nickname))
+    let userGame = partys.find(game => game.players.find(player => player.name === nickname))
 
     // The player is found in a game
     userGame != undefined ? 
@@ -189,7 +226,7 @@ socketio.on('connection', (socket: Socket) => {
   socket.on('game::playerState', payload => {
     const data = JSON.parse(payload)
     const { roomId, nickname, state }: { roomId: number, nickname: string, state: PlayerState } = data
-    const game: Game = games[roomId]
+    const game: Party = partys[roomId]
 
     // search player
     for (const player of game.players) {
@@ -218,7 +255,7 @@ socketio.on('connection', (socket: Socket) => {
   */
   socket.on("game::pause", payload => {
     const { roomId, nickname }: { roomId: number, nickname: string } = payload
-    const game: Game = games[roomId]
+    const game: Party = partys[roomId]
 
     if (game.state != "paused") {
       game.state = "paused"
@@ -235,7 +272,7 @@ socketio.on('connection', (socket: Socket) => {
   */
   socket.on("game::userMagicNumber", payload => {
     const { roomId, magicNumber, nickname }: UserAnswer = payload
-    const game: Game = games[roomId]
+    const game: Party = partys[roomId]
     // search for the player
     let player = game.players.find(player => player.name === nickname)
 
@@ -294,7 +331,7 @@ socketio.on('connection', (socket: Socket) => {
   */
   ee.on("game::start", payload => {
     const { roomId }: Room = payload
-    const game: Game = games[roomId]
+    const game: Party = partys[roomId]
 
     game.round = 1
 
@@ -324,7 +361,7 @@ socketio.on('connection', (socket: Socket) => {
   */
   ee.on("game::finish", payload => {
     const { roomId }: Room = payload
-    const game: Game = games[roomId]
+    const game: Party = partys[roomId]
     
     if (game.isEnded === false) {
       game.isEnded = true
@@ -356,15 +393,15 @@ socketio.on('connection', (socket: Socket) => {
 
 const startGame = (roomId: number, socket: Socket): void => {
   const magicNumber: number =  Math.floor(Math.random() * Math.floor(5))
-  games[roomId].magicNumber = magicNumber
+  partys[roomId].magicNumber = magicNumber
   display(chalk.blue(`${magicNumber} is the magic number.`))
   socket.emit('game::magicNumber', { roomId, magicNumber }) 
-  socket.emit('game::gameStart', { roomId }) 
+  socket.emit('game::partystart', { roomId }) 
 }
 
 const sendNewMagicNumber = (roomId: number, socket: Socket): void => {
   const magicNumber: number =  Math.floor(Math.random() * Math.floor(5))
-  games[roomId].magicNumber = magicNumber
+  partys[roomId].magicNumber = magicNumber
   display(chalk.magenta(`${magicNumber} is the new magic number.`))
   socket.emit('game::magicNumber', { roomId, magicNumber }) 
   socket.emit('game::nextStep', { roomId }) 

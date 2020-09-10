@@ -37,7 +37,23 @@ var server = app.listen(port, function () {
 var socketio = (0, _socket["default"])(server);
 var ee = new _events.EventEmitter();
 var users = {};
-var games = [];
+var partys = [];
+var games = [{
+  id: 0,
+  name: 'MagicNumber',
+  description: 'MagicNumber Game',
+  likes: 72
+}, {
+  id: 1,
+  name: 'QuickWord',
+  description: 'QuickWord Game',
+  likes: 100
+}, {
+  id: 3,
+  name: 'WordAndFurious',
+  description: 'WordAndFurious Game',
+  likes: 56
+}];
 var room = 0;
 /**
  * @description Display a message when a connection has been initialised
@@ -87,7 +103,7 @@ socketio.on('connection', function (socket) {
     var nickname = user.nickname;
     (0, _utils.display)(_chalk["default"].green("Challenger : ".concat(nickname, " ( from ").concat(socket.id, " ) created a party!"))); // create a new game with the user
 
-    games[room] = {
+    partys[room] = {
       id: room,
       beg: "",
       end: "",
@@ -114,10 +130,10 @@ socketio.on('connection', function (socket) {
     var data = JSON.parse(payload);
     var nickname = data.nickname,
         roomId = data.roomId;
-    (0, _utils.display)(_chalk["default"].green("Challenger : ".concat(nickname, " ( from ").concat(socket.id, " ) joined ").concat(games[roomId].players[0].name, "'s party!")));
-    (0, _utils.display)(_chalk["default"].red("".concat(games[roomId].players[0].name, "'s party will start!"))); // add the second user to the game
+    (0, _utils.display)(_chalk["default"].green("Challenger : ".concat(nickname, " ( from ").concat(socket.id, " ) joined ").concat(partys[roomId].players[0].name, "'s party!")));
+    (0, _utils.display)(_chalk["default"].red("".concat(partys[roomId].players[0].name, "'s party will start!"))); // add the second user to the game
 
-    games[roomId].players.push({
+    partys[roomId].players.push({
       name: nickname,
       points: 0,
       state: "not ready"
@@ -127,12 +143,22 @@ socketio.on('connection', function (socket) {
     });
   });
   /**
-   * @description Send all games (for Rooms.tsx)
+   * @description Send all partys (for Rooms.tsx)
    * @return {void}
   */
 
   socket.on('game::getRooms', function () {
     socket.emit('game::rooms', {
+      partys: partys
+    });
+  });
+  /**
+   * @description Send all partys (for Rooms.tsx)
+   * @return {void}
+  */
+
+  socket.on('hub::getGames', function () {
+    socket.emit('hub::sendGames', {
       games: games
     });
   });
@@ -144,7 +170,7 @@ socketio.on('connection', function (socket) {
   socket.on('game::getUserParty', function (payload) {
     var data = JSON.parse(payload);
     var nickname = data.nickname;
-    var userGame = games.find(function (game) {
+    var userGame = partys.find(function (game) {
       return game.players.find(function (player) {
         return player.name === nickname;
       });
@@ -166,7 +192,7 @@ socketio.on('connection', function (socket) {
     var roomId = data.roomId,
         nickname = data.nickname,
         state = data.state;
-    var game = games[roomId]; // search player
+    var game = partys[roomId]; // search player
 
     var _iterator = _createForOfIteratorHelper(game.players),
         _step;
@@ -206,7 +232,7 @@ socketio.on('connection', function (socket) {
   socket.on("game::pause", function (payload) {
     var roomId = payload.roomId,
         nickname = payload.nickname;
-    var game = games[roomId];
+    var game = partys[roomId];
 
     if (game.state != "paused") {
       game.state = "paused";
@@ -224,18 +250,19 @@ socketio.on('connection', function (socket) {
     var roomId = payload.roomId,
         magicNumber = payload.magicNumber,
         nickname = payload.nickname;
-    var game = games[roomId]; // search for the player
+    var game = partys[roomId]; // search for the player
 
     var player = game.players.find(function (player) {
       return player.name === nickname;
     });
     (0, _utils.display)(_chalk["default"].redBright.underline("Received magic number ".concat(magicNumber, " from ").concat(nickname, ".")));
-    (0, _utils.display)(_chalk["default"].red.underline("Round: ".concat(game.round)));
+    (0, _utils.display)(_chalk["default"].red.underline("Round: ".concat(game.round))); // if the current round is less than 3
 
     if (game.round < 3) {
       // if the magic number is the same as the user response
       if (game.magicNumber === magicNumber) {
         if (player != undefined) {
+          // increment player's points
           player.points = player.points + 1; // tell the player he founded the magic number
 
           socket.emit('game::isMagicNumber', {
@@ -244,7 +271,8 @@ socketio.on('connection', function (socket) {
             player: player === null || player === void 0 ? void 0 : player.name
           }); // send a new magic number
 
-          sendNewMagicNumber(roomId, socket);
+          sendNewMagicNumber(roomId, socket); // start next round
+
           game.round = game.round + 1;
         }
       } else {
@@ -253,16 +281,20 @@ socketio.on('connection', function (socket) {
           found: false
         });
       }
-    } else {
-      if (game.magicNumber === magicNumber) {
-        if (player != undefined) {
-          player.points = player.points + 1;
-          ee.emit('game::finish', {
-            roomId: roomId
-          });
+    } // if the current round is 3
+    else {
+        // magic number founded
+        if (game.magicNumber === magicNumber) {
+          // player founded
+          if (player != undefined) {
+            // increment player's points and finish the game
+            player.points = player.points + 1;
+            ee.emit('game::finish', {
+              roomId: roomId
+            });
+          }
         }
       }
-    }
   });
   /* ################################# INTERNS EVENTS ################################# */
 
@@ -273,7 +305,7 @@ socketio.on('connection', function (socket) {
 
   ee.on("game::start", function (payload) {
     var roomId = payload.roomId;
-    var game = games[roomId];
+    var game = partys[roomId];
     game.round = 1;
 
     if (game.haveBeenStarted === false) {
@@ -299,7 +331,7 @@ socketio.on('connection', function (socket) {
 
   ee.on("game::finish", function (payload) {
     var roomId = payload.roomId;
-    var game = games[roomId];
+    var game = partys[roomId];
 
     if (game.isEnded === false) {
       game.isEnded = true; // sort players by points
@@ -324,20 +356,20 @@ socketio.on('connection', function (socket) {
 
 var startGame = function startGame(roomId, socket) {
   var magicNumber = Math.floor(Math.random() * Math.floor(5));
-  games[roomId].magicNumber = magicNumber;
+  partys[roomId].magicNumber = magicNumber;
   (0, _utils.display)(_chalk["default"].blue("".concat(magicNumber, " is the magic number.")));
   socket.emit('game::magicNumber', {
     roomId: roomId,
     magicNumber: magicNumber
   });
-  socket.emit('game::gameStart', {
+  socket.emit('game::partystart', {
     roomId: roomId
   });
 };
 
 var sendNewMagicNumber = function sendNewMagicNumber(roomId, socket) {
   var magicNumber = Math.floor(Math.random() * Math.floor(5));
-  games[roomId].magicNumber = magicNumber;
+  partys[roomId].magicNumber = magicNumber;
   (0, _utils.display)(_chalk["default"].magenta("".concat(magicNumber, " is the new magic number.")));
   socket.emit('game::magicNumber', {
     roomId: roomId,
