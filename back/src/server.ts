@@ -41,8 +41,9 @@ type Party = {
   state: partystate,
   haveBeenStarted: boolean,
   isEnded: boolean,
-  magicNumber: number | null,
-  round: number
+  magicNumber?: number | null,
+  round: number,
+  type: string
 }
 
 type Game = {
@@ -53,7 +54,7 @@ type Game = {
 }
 
 interface GamesObject {
-  MagicNumber: Game[],
+  MagicNumber: any[],
   QuickWord: Game[],
   WordAndFurious: Game[]
 }
@@ -81,7 +82,6 @@ const socketio = io(server)
 const ee = new EventEmitter()
 
 const users: Record<string, User> = {}
-const partys: Party[] = []
 const games: Game[] = [
   {
     id: 0,
@@ -145,13 +145,12 @@ socketio.on('connection', (socket: Socket) => {
   */
   socket.on('game::createParty', payload => {
     const data = JSON.parse(payload)
-    const { user, type } = data
-    const { nickname }: User = user
+    const { nickname, gameType }: any = data
 
     display(chalk.green(`Challenger : ${nickname} ( from ${socket.id} ) created a party!`))
 
     // create a new game with the user (the update)
-    gamesObject[type[room]] = {
+    gamesObject[gameType][room] = {
       id: room, 
       beg: "", 
       end: "", 
@@ -165,25 +164,8 @@ socketio.on('connection', (socket: Socket) => {
       state: "waiting", magicNumber: null,
       haveBeenStarted: false,
       isEnded: false,
-      round: 0
-    }
-
-    // create a new game with the user (will be update)
-    partys[room] = { 
-      id: room, 
-      beg: "", 
-      end: "", 
-      players: [
-        {
-          name: nickname, 
-          points: 0, 
-          state: "not ready"
-        }
-      ], 
-      state: "waiting", magicNumber: null,
-      haveBeenStarted: false,
-      isEnded: false,
-      round: 0
+      round: 0,
+      type: gameType
     }
     // increment the index for the next created game
     room = room + 1
@@ -195,30 +177,20 @@ socketio.on('connection', (socket: Socket) => {
   */
   socket.on('game::joinParty', payload => {
     const data = JSON.parse(payload)
-    const { nickname, roomId, type }: { nickname: string, roomId: number, type: string } = data
+    const { nickname, roomId, gameType }: { nickname: string, roomId: number, gameType: any } = data
 
-    display(chalk.green(`Challenger : ${nickname} ( from ${socket.id} ) joined ${partys[roomId].players[0].name}'s party!`))
-    display(chalk.red(`${partys[roomId].players[0].name}'s party will start!`))
+    display(chalk.green(`Challenger : ${nickname} ( from ${socket.id} ) joined ${gamesObject[gameType][roomId].players[0].name}'s party!`))
+    display(chalk.red(`${gamesObject[gameType][roomId].players[0].name}'s party will start!`))
 
     // add the second user to the game
-    gamesObject[type[roomId]].players.push(
+    gamesObject[gameType][roomId].players.push(
       {
         name: nickname, 
         points: 0, 
         state: "not ready"
       }
     )
-
-    // add the second user to the game
-    partys[roomId].players.push(
-      {
-        name: nickname, 
-        points: 0, 
-        state: "not ready"
-      }
-    )
-
-    ee.emit('game::start', { roomId }) 
+    ee.emit('game::start', { roomId, gameType }) 
   })
 
   /**
@@ -226,13 +198,14 @@ socketio.on('connection', (socket: Socket) => {
    * @return {void}
   */
   socket.on('game::getRooms', () => {
+    const partys = gamesObject.MagicNumber.concat(gamesObject.QuickWord).concat(gamesObject.WordAndFurious)
     socket.emit('game::rooms', {
-      partys,
+      partys
     })
   })
 
   /**
-   * @description Send all partys (for Rooms.tsx)
+   * @description Send all games to the hub
    * @return {void}
   */
   socket.on('hub::getGames', () => {
@@ -247,9 +220,9 @@ socketio.on('connection', (socket: Socket) => {
   */
   socket.on('game::getUserParty', payload => {
     const data = JSON.parse(payload)
-    const { nickname }: User = data
+    const { nickname, gameType }: any = data
 
-    let userGame = partys.find(game => game.players.find(player => player.name === nickname))
+    let userGame = gamesObject[gameType].find(game => game.players.find(player => player.name === nickname))
 
     // The player is found in a game
     userGame != undefined ? 
@@ -266,7 +239,7 @@ socketio.on('connection', (socket: Socket) => {
   socket.on('game::playerState', payload => {
     const data = JSON.parse(payload)
     const { roomId, nickname, state }: { roomId: number, nickname: string, state: PlayerState } = data
-    const game: Party = partys[roomId]
+    const game: Party = gamesObject['MagicNumber'][roomId]
 
     // search player
     for (const player of game.players) {
@@ -295,7 +268,7 @@ socketio.on('connection', (socket: Socket) => {
   */
   socket.on("game::pause", payload => {
     const { roomId, nickname }: { roomId: number, nickname: string } = payload
-    const game: Party = partys[roomId]
+    const game: Party = gamesObject['MagicNumber'][roomId]
 
     if (game.state != "paused") {
       game.state = "paused"
@@ -312,13 +285,11 @@ socketio.on('connection', (socket: Socket) => {
   */
   socket.on("game::userMagicNumber", payload => {
     const { roomId, magicNumber, nickname }: UserAnswer = payload
-    const game: Party = partys[roomId]
+    const game: Party = gamesObject['MagicNumber'][roomId]
     // search for the player
     let player = game.players.find(player => player.name === nickname)
 
     display(chalk.redBright.underline(`Received magic number ${magicNumber} from ${nickname}.`))
-
-    display(chalk.red.underline(`Round: ${game.round}`))
 
     // if the current round is less than 3
     if (game.round < 3) {
@@ -340,6 +311,7 @@ socketio.on('connection', (socket: Socket) => {
 
           // start next round
           game.round = game.round + 1
+          changeRound(roomId, socket)
         }  
       }
       else {
@@ -357,7 +329,7 @@ socketio.on('connection', (socket: Socket) => {
         if (player != undefined){
           // increment player's points and finish the game
           player.points = player.points + 1
-          ee.emit('game::finish', { roomId }) 
+          ee.emit('game::finish', { roomId, gameType: 'MagicNumber' }) 
         }
       }
     }
@@ -371,10 +343,8 @@ socketio.on('connection', (socket: Socket) => {
   */
   ee.on("game::start", payload => {
     const { roomId }: Room = payload
-    const { type }: any = payload
-    const game: Party = partys[roomId]
-
-    const newGame = gamesObject[type[roomId]]
+    const { gameType }: any = payload
+    const game: Party = gamesObject[gameType][roomId]
 
     game.round = 1
 
@@ -387,10 +357,11 @@ socketio.on('connection', (socket: Socket) => {
 
         game.players[0].state = "In game"
         game.players[1].state = "In game"
+
         display(chalk.greenBright(`${game.players[0].name}'s party has started.`))
 
         // start the game
-        startGame(roomId, socket)
+        startGame(roomId, socket, gameType)
       }
       else {
         display(chalk.redBright(`Cannot start ${game.players[0].name}'s party. Error: Missing player(s)`))
@@ -404,7 +375,8 @@ socketio.on('connection', (socket: Socket) => {
   */
   ee.on("game::finish", payload => {
     const { roomId }: Room = payload
-    const game: Party = partys[roomId]
+    const { gameType }: any = payload
+    const game: Party = gamesObject[gameType][roomId]
     
     if (game.isEnded === false) {
       game.isEnded = true
@@ -426,7 +398,7 @@ socketio.on('connection', (socket: Socket) => {
       display(chalk.greenBright(`${game.players[0].name}'s party has finished.`))
       display(chalk.white(`${winner.name} won with ${winner.points} points !`))
 
-      endGame(roomId, socket, ranking)
+      endGame(roomId, socket, ranking, gameType)
     }
   })
 
@@ -434,22 +406,26 @@ socketio.on('connection', (socket: Socket) => {
 
 /* ################################# FUNCTIONS ################################# */
 
-const startGame = (roomId: number, socket: Socket): void => {
-  const magicNumber: number =  Math.floor(Math.random() * Math.floor(5))
-  partys[roomId].magicNumber = magicNumber
-  display(chalk.blue(`${magicNumber} is the magic number.`))
-  socket.emit('game::magicNumber', { roomId, magicNumber }) 
-  socket.emit('game::partystart', { roomId }) 
+const startGame = (roomId: number, socket: Socket, type: any): void => {
+  const game: Party = gamesObject[type][roomId]
+  if (type === 'MagicNumber'){
+    sendNewMagicNumber(roomId, socket)
+  }
+  socket.emit('game::partystart', { roomId, gameType: type }) 
 }
 
 const sendNewMagicNumber = (roomId: number, socket: Socket): void => {
   const magicNumber: number =  Math.floor(Math.random() * Math.floor(5))
-  partys[roomId].magicNumber = magicNumber
-  display(chalk.magenta(`${magicNumber} is the new magic number.`))
-  socket.emit('game::magicNumber', { roomId, magicNumber }) 
+  const game: Party = gamesObject['MagicNumber'][roomId]
+  game.magicNumber = magicNumber
+  display(chalk.magenta(`${magicNumber} is the magic number.`))
+  socket.emit('game::magicNumber', { roomId, magicNumber })
+}
+
+const changeRound = (roomId: number, socket: Socket): void => {
   socket.emit('game::nextStep', { roomId }) 
 }
 
-const endGame = (roomId: number, socket: Socket, ranking: any): void => {
-  socket.emit('game::gameFinish', { roomId, ranking })
+const endGame = (roomId: number, socket: Socket, ranking: any, type: any): void => {
+  socket.emit('game::gameFinish', { roomId, ranking, gameType: type })
 }

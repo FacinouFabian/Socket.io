@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react"
 import { useUser } from '../core/contexts/userContext'
+import { Link } from 'react-router-dom'
 
 type Game = {
     id: number,
@@ -21,11 +22,9 @@ export default function HUB(): JSX.Element {
 
     useEffect(() => {
         io.emit("hub::getGames")
-        console.log('hello')
     
         io.on('hub::sendGames', ({ games }: { games: Game[] }) => {
             setGames(games)
-            console.log('received')
         })
     })
 
@@ -75,10 +74,11 @@ export default function HUB(): JSX.Element {
                                 <div className="bg-gray-50 px-4 py-4 sm:px-6">
                                     <div className="text-sm leading-5">
                                     <button
+                                        type="button"
                                         onClick={(): void => chooseGameType(game.name)}>
-                                            <a href="#" className="font-medium text-indigo-600 hover:text-indigo-500 transition ease-in-out duration-150">
-                                                Play
-                                            </a>
+                                        <Link to="/register">
+                                            Play
+                                        </Link>
                                     </button>
                                     </div>
                                 </div>

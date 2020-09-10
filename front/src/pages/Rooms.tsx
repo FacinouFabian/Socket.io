@@ -16,24 +16,29 @@ type Game = {
   beg: string,
   end: string,
   players: Players,
-  state: GameState
+  state: GameState,
+  haveBeenStarted: boolean,
+  isEnded: boolean,
+  magicNumber?: number,
+  round: number,
+  type: string
 }
 
 export default function Rooms(): JSX.Element {
   const [rooms, setRooms] = useState<Game[]>([]);
   const [user, dispatch] = useUser()
-  const { io } = user
+  const { io, gameType } = user
 
   const handleJoin = (roomId: number) => {
-    io.emit("game::joinParty", JSON.stringify({ roomId, nickname: user.nickname }))
-    io.emit('game::begin', { roomId })
+    io.emit("game::joinParty", JSON.stringify({ roomId, nickname: user.nickname, gameType }))
+    io.emit('game::begin', { roomId, gameType })
   };
 
   useEffect(() => {
     io.emit("game::getRooms")
 
-    io.on('game::rooms', ({ games }: { games: Game[] }) => {
-      setRooms(games)
+    io.on('game::rooms', ({ partys }: { partys: Game[] }) => {
+      setRooms(partys)
     })
   })
 
@@ -49,7 +54,10 @@ export default function Rooms(): JSX.Element {
                         <li className="col-span-1 bg-white rounded-lg shadow">
                             <div className="bg-white overflow-hidden shadow rounded-lg">
                                 <div className="border-b border-gray-200 px-4 py-5 sm:px-6">
-                                    <h1>{item.players[0].name}'s party</h1>
+                                  <h1>
+                                    {item.players[0].name}'s party{' '}
+                                    <span>({item.type})</span>
+                                  </h1>
                                 </div>
                                 <div className="px-4 py-5 sm:p-6">
                                     <span>
@@ -62,8 +70,12 @@ export default function Rooms(): JSX.Element {
                                       type="button"
                                       onClick={() => handleJoin(item.id)}
                                     >
-                                      <Link to="/games">
-                                      Join
+                                      <Link to={
+                                        gameType === 'MagicNumber' ? "/magicnumber" 
+                                        : gameType === 'QuickWord' ? "/quickword" 
+                                        : "/wordandfurious"
+                                      }>
+                                        Join
                                       </Link>
                                     </button>
                                 </div>

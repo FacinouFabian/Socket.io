@@ -24,8 +24,12 @@ export default function Register(): JSX.Element {
 
   const handleCreateParty = () => {
     io.emit("game::sendNickname", JSON.stringify({ nickname }))
-    io.emit("game::createParty", JSON.stringify({ nickname }))
+    io.emit("game::createParty", JSON.stringify({ nickname, gameType }))
   }
+
+  useEffect(() => {
+    console.log("Type:", gameType)
+  })
 
   return (
     <div className="m-auto">
@@ -60,7 +64,11 @@ export default function Register(): JSX.Element {
               onClick={() => handleCreateParty()}
             >
               {/* Will be changed */}
-              <Link to={gameType === 'MagicNumber' ? "/games" : gameType === 'QuickWord' ? "/games" : "/games"}>
+              <Link to={
+                gameType === 'MagicNumber' ? "/magicnumber" 
+                : gameType === 'QuickWord' ? "/quickword" 
+                : "/wordandfurious"
+              }>
                 Send and create a party
               </Link>
             </button>

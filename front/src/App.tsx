@@ -1,6 +1,6 @@
 import React, { useState, FunctionComponent } from "react";
 import { BrowserRouter as Router, Switch, Route } from 'react-router-dom'
-import { Hello, Register, Rooms, Game, HUB } from "./pages"
+import { Hello, Register, Rooms, MagicNumber, QuickWord, WordAndFurious, HUB } from "./pages"
 import Layout from './core/layouts/showcase'
 import User, { UserProvider } from './core/contexts/userContext'
 
@@ -19,7 +19,9 @@ export default function App(): JSX.Element {
     { slug: 'hello', Component: Hello },
     { slug: 'register', Component: Register },
     { slug: 'rooms', Component: Rooms },
-    { slug: 'games', Component: Game },
+    { slug: 'quickword', Component: QuickWord },
+    { slug: 'magicnumber', Component: MagicNumber },
+    { slug: 'wordandfurious', Component: WordAndFurious },
   ]
 
   return (

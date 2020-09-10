@@ -30,14 +30,14 @@ type Game = {
   state: GameState
 }
 
-export default function Game(): JSX.Element {
+export default function MagicNumber(): JSX.Element {
   const initialGame: Game = { id: null, beg: "", end: "", players: [], state: "waiting" }
   const [game, setGame] = useState<Game>(initialGame)
   const [serverMessage, setServerMessage] = useState<MagicNumberResult>()
   const [scores, setScores] = useState<Scores>()
   const [value, setValue] = useState<string>('')
   const [user, dispatch] = useUser()
-  const { io } = user
+  const { io, gameType } = user
 
   const sendMagicNumber = (): void => {
     io.emit('game::userMagicNumber', { 
@@ -58,22 +58,23 @@ export default function Game(): JSX.Element {
   }
 
   useEffect(() => {
-    io.emit("game::getUserParty", JSON.stringify({ nickname: user.nickname }))
+    io.emit("game::getUserParty", JSON.stringify({ nickname: user.nickname, gameType }))
 
     io.on('game::userParty', ({ party }: { party: any }) => {
       setGame(party)
+      console.log(party)
     })
 
-    io.on('game::gameStart', ({ roomId }: { roomId: number }) => {
-      if (roomId === game.id) {
+    io.on('game::gameStart', ({ roomId, type }: { roomId: number, type: any }) => {
+      if (roomId === game.id && type === gameType) {
         game.players.map(player => {
           player.state = "In game"
         })
       }
     })
 
-    io.on('game::gameFinish', ({ roomId, ranking }: { roomId: number, ranking: Scores }) => {
-      if (roomId === game.id) {
+    io.on('game::gameFinish', ({ roomId, ranking, type }: { roomId: number, ranking: Scores, type: any }) => {
+      if (roomId === game.id && type === gameType) {
         game.players.map(player => {
           player.state = "not ready"
         })
