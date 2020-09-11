@@ -38,6 +38,7 @@ export default function Rooms(): JSX.Element {
     io.emit("game::getRooms")
 
     io.on('game::rooms', ({ partys }: { partys: Game[] }) => {
+      console.log(partys)
       setRooms(partys)
     })
   })

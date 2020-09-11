@@ -12,6 +12,12 @@ var _events = require("events");
 
 var _moment = _interopRequireDefault(require("moment"));
 
+var _fs = _interopRequireDefault(require("fs"));
+
+var _path = _interopRequireDefault(require("path"));
+
+var _randomWords = _interopRequireDefault(require("random-words"));
+
 var _utils = require("./utils");
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { "default": obj }; }
@@ -21,6 +27,10 @@ function _createForOfIteratorHelper(o, allowArrayLike) { var it; if (typeof Symb
 function _unsupportedIterableToArray(o, minLen) { if (!o) return; if (typeof o === "string") return _arrayLikeToArray(o, minLen); var n = Object.prototype.toString.call(o).slice(8, -1); if (n === "Object" && o.constructor) n = o.constructor.name; if (n === "Map" || n === "Set") return Array.from(o); if (n === "Arguments" || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(n)) return _arrayLikeToArray(o, minLen); }
 
 function _arrayLikeToArray(arr, len) { if (len == null || len > arr.length) len = arr.length; for (var i = 0, arr2 = new Array(len); i < len; i++) { arr2[i] = arr[i]; } return arr2; }
+
+var dbFilePath = _path["default"].join(__dirname, '../db');
+
+var gamesJsonFile = _path["default"].join(dbFilePath, 'games.json');
 
 var gamesObject = {
   MagicNumber: [],
@@ -58,6 +68,7 @@ var games = [{
   description: 'WordAndFurious Game',
   likes: 56
 }];
+var partys = [];
 var room = 0;
 /**
  * @description Display a message when a connection has been initialised
@@ -106,9 +117,7 @@ socketio.on('connection', function (socket) {
     var data = JSON.parse(payload);
     var nickname = data.nickname,
         gameType = data.gameType;
-    (0, _utils.display)(_chalk["default"].green("Challenger : ".concat(nickname, " ( from ").concat(socket.id, " ) created a party!"))); // create a new game with the user (the update)
-
-    gamesObject[gameType][room] = {
+    var newGame = {
       id: room,
       beg: "",
       end: "",
@@ -123,7 +132,13 @@ socketio.on('connection', function (socket) {
       isEnded: false,
       round: 0,
       type: gameType
-    }; // increment the index for the next created game
+    };
+    (0, _utils.display)(_chalk["default"].green("Challenger : ".concat(nickname, " ( from ").concat(socket.id, " ) created a party!"))); // create a new game with the user (the update)
+
+    gamesObject[gameType][room] = newGame;
+    partys.push(newGame); // save game
+
+    saveGames(); // increment the index for the next created game
 
     room = room + 1;
   });
@@ -145,10 +160,6 @@ socketio.on('connection', function (socket) {
       points: 0,
       state: "not ready"
     });
-    ee.emit('game::start', {
-      roomId: roomId,
-      gameType: gameType
-    });
   });
   /**
    * @description Send all partys (for Rooms.tsx)
@@ -156,7 +167,7 @@ socketio.on('connection', function (socket) {
   */
 
   socket.on('game::getRooms', function () {
-    var partys = gamesObject.MagicNumber.concat(gamesObject.QuickWord).concat(gamesObject.WordAndFurious);
+    /* display(chalk.yellow(`${JSON.stringify(partys)}`)) */
     socket.emit('game::rooms', {
       partys: partys
     });
@@ -197,12 +208,14 @@ socketio.on('connection', function (socket) {
    * @return {void}
   */
 
-  socket.on('game::playerState', function (payload) {
+  socket.on('game::ready', function (payload) {
     var data = JSON.parse(payload);
     var roomId = data.roomId,
         nickname = data.nickname,
-        state = data.state;
-    var game = gamesObject['MagicNumber'][roomId]; // search player
+        type = data.type,
+        ready = data.ready;
+    var game = gamesObject[type][roomId];
+    (0, _utils.display)(_chalk["default"].red.underline("Player ".concat(nickname, " said that he is ").concat(ready, "."))); // search player
 
     var _iterator = _createForOfIteratorHelper(game.players),
         _step;
@@ -214,7 +227,7 @@ socketio.on('connection', function (socket) {
         // if player found
         if (player.name === nickname) {
           // change player's state 
-          player.state = state;
+          ready === true ? player.state = 'ready' : player.state = 'not ready';
           (0, _utils.display)(_chalk["default"].blue("Player ".concat(player.name, " is ").concat(player.state, ".")));
         }
       } // if the game have 2 players
@@ -229,7 +242,8 @@ socketio.on('connection', function (socket) {
       // if the 2 players are ready to play
       game.players[0].state === "ready" && game.players[1].state === "ready" ? //start the game
       ee.emit('game::start', {
-        roomId: roomId
+        roomId: roomId,
+        gameType: type
       }) // else
       : (0, _utils.display)(_chalk["default"].yellowBright('Waiting for the 2nd player before starting.'));
     }
@@ -252,7 +266,29 @@ socketio.on('connection', function (socket) {
     }
   });
   /**
-   * @description Starts a game
+   * @description Leave a game
+   * @return {void}
+  */
+
+  socket.on("game::leave", function (payload) {
+    var data = JSON.parse(payload);
+    var roomId = data.roomId,
+        nickname = data.nickname,
+        type = data.type;
+    var game = gamesObject[type][roomId];
+    var players = game.players;
+
+    for (var player in players) {
+      if (players[player].name === nickname) {
+        players.splice(parseInt(player), 1);
+      }
+    }
+
+    (0, _utils.display)(_chalk["default"].yellow("Player ".concat(nickname, " has left ").concat(players[0].name, "'s party.")));
+    /* ee.emit('game::finish', { roomId, gameType, left: { nickname } })  */
+  });
+  /**
+   * @description listen for user response of magicnumber
    * @return {void}
   */
 
@@ -265,47 +301,91 @@ socketio.on('connection', function (socket) {
     var player = game.players.find(function (player) {
       return player.name === nickname;
     });
-    (0, _utils.display)(_chalk["default"].redBright.underline("Received magic number ".concat(magicNumber, " from ").concat(nickname, "."))); // if the current round is less than 3
+    (0, _utils.display)(_chalk["default"].redBright.underline("Received magic number ".concat(magicNumber, " from ").concat(nickname, "."))); // if the player is found
 
-    if (game.round < 3) {
-      // if the magic number is the same as the user response
-      if (game.magicNumber === magicNumber) {
-        if (player != undefined) {
-          // increment player's points
-          player.points = player.points + 1; // tell the player he founded the magic number
-
-          socket.emit('game::isMagicNumber', {
-            roomId: roomId,
-            found: true,
-            player: player === null || player === void 0 ? void 0 : player.name
-          }); // send a new magic number
-
-          sendNewMagicNumber(roomId, socket); // start next round
-
-          game.round = game.round + 1;
-          changeRound(roomId, socket);
-        }
-      } else {
-        // tell the player he doesn't found the magic number
-        socket.emit('game::isMagicNumber', {
-          found: false
-        });
-      }
-    } // if the current round is 3
-    else {
-        // magic number founded
+    if (player != undefined) {
+      if (player.points < 3) {
+        // if the word is the same as the user response
         if (game.magicNumber === magicNumber) {
-          // player founded
-          if (player != undefined) {
-            // increment player's points and finish the game
-            player.points = player.points + 1;
+          // increment player's points
+          player.points = player.points + 1;
+
+          if (player.points < 3) {
+            // tell the player he founded the magic number
+            socket.emit('game::isWord', {
+              roomId: roomId,
+              found: true,
+              player: player === null || player === void 0 ? void 0 : player.name
+            }); // send a new word
+
+            sendNewMagicNumber(roomId, socket); // start next round
+
+            game.round = game.round + 1;
+            changeRound(roomId, socket);
+          } else {
             ee.emit('game::finish', {
               roomId: roomId,
               gameType: 'MagicNumber'
             });
           }
+        } else {
+          // tell the player he doesn't found the magic number
+          socket.emit('game::isMagicNumber', {
+            found: false
+          });
         }
       }
+    }
+  });
+  /**
+   * @description listen for user response of quickWord
+   * @return {void}
+  */
+
+  socket.on("game::userQuickWord", function (payload) {
+    var roomId = payload.roomId,
+        word = payload.word,
+        nickname = payload.nickname;
+    var game = gamesObject['QuickWord'][roomId]; // search for the player
+
+    var player = game.players.find(function (player) {
+      return player.name === nickname;
+    });
+    (0, _utils.display)(_chalk["default"].redBright.underline("Received word ".concat(word, " from ").concat(nickname, "."))); // if the player is found
+
+    if (player != undefined) {
+      if (player.points < 15) {
+        // if the word is the same as the user response
+        if (game.quickWord === word) {
+          // increment player's points
+          player.points = player.points + 1;
+
+          if (player.points < 15) {
+            // tell the player he founded the magic number
+            socket.emit('game::isWord', {
+              roomId: roomId,
+              found: true,
+              player: player === null || player === void 0 ? void 0 : player.name
+            }); // send a new word
+
+            sendNewWord(roomId, socket); // start next round
+
+            game.round = game.round + 1;
+            changeRound(roomId, socket);
+          } else {
+            ee.emit('game::finish', {
+              roomId: roomId,
+              gameType: 'QuickWord'
+            });
+          }
+        } else {
+          // tell the player he doesn't found the magic number
+          socket.emit('game::isWord', {
+            found: false
+          });
+        }
+      }
+    }
   });
   /* ################################# INTERNS EVENTS ################################# */
 
@@ -330,7 +410,9 @@ socketio.on('connection', function (socket) {
         game.players[1].state = "In game";
         (0, _utils.display)(_chalk["default"].greenBright("".concat(game.players[0].name, "'s party has started."))); // start the game
 
-        startGame(roomId, socket, gameType);
+        startGame(roomId, socket, gameType); // save game
+
+        saveGames();
       } else {
         (0, _utils.display)(_chalk["default"].redBright("Cannot start ".concat(game.players[0].name, "'s party. Error: Missing player(s)")));
       }
@@ -361,17 +443,19 @@ socketio.on('connection', function (socket) {
 
       (0, _utils.display)(_chalk["default"].greenBright("".concat(game.players[0].name, "'s party has finished.")));
       (0, _utils.display)(_chalk["default"].white("".concat(winner.name, " won with ").concat(winner.points, " points !")));
-      endGame(roomId, socket, ranking, gameType);
+      endGame(roomId, socket, ranking, gameType); // save game
+
+      saveGames();
     }
   });
 });
 /* ################################# FUNCTIONS ################################# */
 
 var startGame = function startGame(roomId, socket, type) {
-  var game = gamesObject[type][roomId];
-
   if (type === 'MagicNumber') {
     sendNewMagicNumber(roomId, socket);
+  } else if (type === 'QuickWord') {
+    sendNewWord(roomId, socket);
   }
 
   socket.emit('game::partystart', {
@@ -391,6 +475,17 @@ var sendNewMagicNumber = function sendNewMagicNumber(roomId, socket) {
   });
 };
 
+var sendNewWord = function sendNewWord(roomId, socket) {
+  var newWord = (0, _randomWords["default"])();
+  var game = gamesObject['QuickWord'][roomId];
+  game.quickWord = newWord;
+  (0, _utils.display)(_chalk["default"].magenta("".concat(newWord, " is the new word.")));
+  socket.emit('game::quickWord', {
+    roomId: roomId,
+    word: newWord
+  });
+};
+
 var changeRound = function changeRound(roomId, socket) {
   socket.emit('game::nextStep', {
     roomId: roomId
@@ -403,4 +498,18 @@ var endGame = function endGame(roomId, socket, ranking, type) {
     ranking: ranking,
     gameType: type
   });
+};
+
+var saveGames = function saveGames() {
+  if (_fs["default"].existsSync(gamesJsonFile)) {
+    _fs["default"].writeFile(gamesJsonFile, JSON.stringify(partys, null, 4), function (err) {
+      if (err) {
+        (0, _utils.display)(_chalk["default"].red.underline(err));
+      }
+
+      (0, _utils.display)(_chalk["default"].green("The games were saved!"));
+    });
+  } else {
+    (0, _utils.display)(_chalk["default"].red.underline("FILE CHECK ERROR!"));
+  }
 };

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useUser } from '../core/contexts/userContext'
 import useInput from "../hooks/useInput"
+import { Link } from 'react-router-dom'
 
 type PlayerState = "ready" | "not ready" | "In game"
 
@@ -22,19 +23,36 @@ type GameState = "waiting" | "started" | "paused" | "finished"
 
 type Players = Player[]
 
-type Game = {
+type Party = {
   id: number | null,
   beg: string,
   end: string,
   players: Players,
-  state: GameState
+  state: GameState,
+  haveBeenStarted: boolean,
+  isEnded: boolean,
+  magicNumber?: number | null,
+  round: number,
+  type: string
 }
 
 export default function MagicNumber(): JSX.Element {
-  const initialGame: Game = { id: null, beg: "", end: "", players: [], state: "waiting" }
-  const [game, setGame] = useState<Game>(initialGame)
+  const initialGame: Party = { 
+    id: null, 
+    beg: "", 
+    end: "", 
+    players: [], 
+    state: "waiting", 
+    haveBeenStarted: false,
+    isEnded: false,
+    magicNumber: null,
+    round: 0,
+    type: 'MagicNumber'
+  }
+  const [game, setGame] = useState<Party>(initialGame)
   const [serverMessage, setServerMessage] = useState<MagicNumberResult>()
   const [scores, setScores] = useState<Scores>()
+  const [ready, setReady] = useState<boolean>(true)
   const [value, setValue] = useState<string>('')
   const [user, dispatch] = useUser()
   const { io, gameType } = user
@@ -57,16 +75,33 @@ export default function MagicNumber(): JSX.Element {
     })
   }
 
+  const checkKeyPressed = (event: React.KeyboardEvent): void => {
+    if (event.key === 'Enter') {
+      sendMagicNumber()
+    }
+  }
+
+  const handlePlayerState =  (): void => {
+    const type = game.type
+    setReady(!ready)
+    io.emit("game::ready", JSON.stringify({ roomId: game.id, nickname: user.nickname, type, ready }))
+  }
+
+  const leave =  (): void => {
+    const type = game.type
+    io.emit("game::leave", JSON.stringify({ roomId: game.id, nickname: user.nickname, type }))
+  }
+
   useEffect(() => {
     io.emit("game::getUserParty", JSON.stringify({ nickname: user.nickname, gameType }))
 
-    io.on('game::userParty', ({ party }: { party: any }) => {
+    io.on('game::userParty', ({ party }: { party: Party }) => {
       setGame(party)
-      console.log(party)
     })
 
     io.on('game::gameStart', ({ roomId, type }: { roomId: number, type: any }) => {
       if (roomId === game.id && type === gameType) {
+        game.haveBeenStarted = true
         game.players.map(player => {
           player.state = "In game"
         })
@@ -75,6 +110,7 @@ export default function MagicNumber(): JSX.Element {
 
     io.on('game::gameFinish', ({ roomId, ranking, type }: { roomId: number, ranking: Scores, type: any }) => {
       if (roomId === game.id && type === gameType) {
+        game.isEnded = true
         game.players.map(player => {
           player.state = "not ready"
         })
@@ -90,7 +126,34 @@ export default function MagicNumber(): JSX.Element {
   
   return (
     <div className="flex flex-col items-center justify-center">
-        <h1 className="absolute top-0 text-4xl font-bold">Socket Game (Magic Number)</h1>
+        <h1 className="absolute top-0 text-4xl font-bold">Socket Game (MagicNumber)</h1>
+        <div className="flex items-center justify-center">
+          {game.haveBeenStarted === false ?
+            <div className="flex items-center justify-between w-full">
+              <button
+                className="bg-blue-800 hover:bg-red-800 text-white px-6 py-2 rounded-md"
+                type="button"
+                onClick={() => handlePlayerState()}
+              >
+                {ready === false ? 'Cancel' : 'Ready'}
+              </button>
+            </div>
+            : ''
+          }
+
+          <div className="flex items-center justify-between w-full">
+            <button
+              className="bg-blue-800 hover:bg-red-800 text-white px-6 py-2 rounded-md"
+              type="button"
+              onClick={() => leave()}
+            >
+              <Link to="/">
+                Leave
+              </Link>
+            </button>
+          </div>
+        </div>
+
         <div className="w-full flex flex-col items-center justify-center">
             <div>
               <div>
@@ -204,8 +267,8 @@ export default function MagicNumber(): JSX.Element {
             </div>
 
             <div>
-              { (game.players.length === 2) ? 
-                <form className="bg-white shadow-md rounded-lg px-8 py-8">
+              { game.isEnded === false && game.players.length === 2 ? 
+                <div className="bg-white shadow-md rounded-lg px-8 py-8">
                   <div className="flex flex-col items-center justify-center mb-4">
                     <label className="block text-black text-md font-bold mb-2">
                       Magic Number 
@@ -215,18 +278,10 @@ export default function MagicNumber(): JSX.Element {
                       placeholder="Magic Number..."
                       value={value}
                       onChange={(event: React.ChangeEvent<HTMLInputElement>): void => setValue(event.target.value)}
+                      onKeyPress={(event: React.KeyboardEvent<HTMLInputElement>): void => checkKeyPressed(event)}
                     />
                   </div>
-                  <div className="flex flex-col items-center justify-between w-full">
-                    <button
-                      className="bg-blue-800 hover:bg-red-800 text-white px-6 py-2 rounded-md"
-                      type="button"
-                      onClick={() => sendMagicNumber()}
-                    >
-                      Send
-                    </button>
-                  </div>
-                </form>
+                </div>
                 : ''
               }
 
@@ -252,7 +307,7 @@ export default function MagicNumber(): JSX.Element {
                             serverMessage?.found === false ?
                               <span>Wrong answer!🙊 Try again! 😃</span>
                             : 
-                            scores != undefined ?
+                            game.isEnded === true && scores != undefined ?
                               <span>
                                 Congratulations!✨ player{' '}
                                 <strong className="p-2 bg-indigo-800 text-white rounded-md">{scores[0].name}</strong>
