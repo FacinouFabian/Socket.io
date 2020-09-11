@@ -1,4 +1,7 @@
 export { default as Hello } from './Hello'
 export { default as Register } from './Register'
 export { default as Rooms } from './Rooms'
-export { default as Game } from './Game'
+export { default as MagicNumber } from './MagicNumber'
+export { default as QuickWord } from './QuickWord'
+export { default as WordAndFurious } from './WordAndFurious'
+export { default as HUB } from './Hub'

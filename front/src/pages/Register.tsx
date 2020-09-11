@@ -12,21 +12,24 @@ export default function Register(): JSX.Element {
   const [player, setPlayer] = useState<Player>();
   const { value: nickname, bind } = useInput();
   const [user, dispatch] = useUser()
-  const { io } = user
+  const { io, gameType } = user
 
   const handleJoinParty = () => {
     io.on("game::start", ({ points }: { points: number }) => {
       setPlayer({ nickname, points });
-    });
+    })
 
     io.emit("game::sendNickname", JSON.stringify({ nickname }))
-  
   };
 
   const handleCreateParty = () => {
     io.emit("game::sendNickname", JSON.stringify({ nickname }))
-    io.emit("game::createParty", JSON.stringify({ nickname }))
+    io.emit("game::createParty", JSON.stringify({ nickname, gameType }))
   }
+
+  useEffect(() => {
+    console.log("Type:", gameType)
+  })
 
   return (
     <div className="m-auto">
@@ -40,7 +43,7 @@ export default function Register(): JSX.Element {
               Nickname
             </label>
             <input
-              className="shawod appearance-none border rounded py-2 px-4"
+              className="shadow appearance-none border rounded py-2 px-4"
               placeholder="Sephiroth"
               {...bind}
             />
@@ -60,7 +63,12 @@ export default function Register(): JSX.Element {
               type="button"
               onClick={() => handleCreateParty()}
             >
-              <Link to="/games">
+              {/* Will be changed */}
+              <Link to={
+                gameType === 'MagicNumber' ? "/magicnumber" 
+                : gameType === 'QuickWord' ? "/quickword" 
+                : "/wordandfurious"
+              }>
                 Send and create a party
               </Link>
             </button>

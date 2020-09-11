@@ -1,0 +1,26 @@
+[
+    {
+        "id": 0,
+        "beg": "2020-09-11T18:02:48+02:00",
+        "end": "",
+        "players": [
+            {
+                "name": "a",
+                "points": 0,
+                "state": "In game"
+            },
+            {
+                "name": "w",
+                "points": 0,
+                "state": "In game"
+            }
+        ],
+        "state": "started",
+        "magicNumber": null,
+        "haveBeenStarted": true,
+        "isEnded": false,
+        "round": 1,
+        "type": "QuickWord",
+        "quickWord": "difficulty"
+    }
+]

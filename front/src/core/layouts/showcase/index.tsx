@@ -24,7 +24,7 @@ export default function Showcase({ title, children }: Props): JSX.Element {
       </Helmet>
 
       <main className='w-full h-screen my-0 mx-auto block bg-blue-200'>
-        <div className="p-6 flex flex-col items-center justify-center">
+        <div className="p-6 h-full flex flex-col items-center justify-center">
           {children}
         </div>
       </main>

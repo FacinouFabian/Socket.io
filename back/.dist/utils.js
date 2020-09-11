@@ -3,7 +3,7 @@
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.display = exports.isNull = exports.isNotNull = void 0;
+exports.startGame = exports.display = exports.isNull = exports.isNotNull = void 0;
 
 var _moment = _interopRequireDefault(require("moment"));
 
@@ -73,3 +73,13 @@ var display = function display(str) {
 };
 
 exports.display = display;
+
+var startGame = function startGame(roomId, socket) {
+  var magicNumber = Math.floor(Math.random() * Math.floor(1337));
+  socket.emit('game::magicNumber', {
+    roomId: roomId,
+    magicNumber: magicNumber
+  });
+};
+
+exports.startGame = startGame;

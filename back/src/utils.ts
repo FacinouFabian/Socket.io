@@ -1,4 +1,5 @@
 import moment from 'moment'
+import { Socket } from 'socket.io'
 
 /**
  * @function isNotNull
@@ -45,3 +46,8 @@ export const isNull = (...values: unknown[]): boolean => !isNotNull(...values)
  *
  */
 export const display = (str: string): void => console.log(`[${moment()}] ${str}`)
+
+export const startGame = (roomId: number, socket: Socket): void => {
+  const magicNumber: number =  Math.floor(Math.random() * Math.floor(1337))
+  socket.emit('game::magicNumber', { roomId, magicNumber }) 
+}
